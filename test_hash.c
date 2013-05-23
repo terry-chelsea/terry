@@ -5,7 +5,7 @@
 
 //char *line1 = "1234567890123";
 //char *line2 = "3210987654321";
-#define MAX  10
+#define MAX  1000
 int main()
 {
     char str[16];
@@ -20,8 +20,8 @@ int main()
     int i = 0;
     srand(getpid());
     int num1 = rand() % MAX;
-    snprintf(str , 16 , "%d" , num1);
-    printf("test number %s\n" , str);
+    int len = snprintf(str , 16 , "%d" , num1);
+    printf("test number %s len is %d\n" , str , len);
 
     for_each_result(str , strlen(str) + 1 , temp)
     {
