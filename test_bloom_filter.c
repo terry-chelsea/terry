@@ -219,11 +219,13 @@ void start_test(char *bm , int sz)
 int test_bloom_filter()
 {
     int hash = 0;
-//    printf("Min bitmap size is %lf bits , hash functions %d\n" , m , hash);
     double m = cal_bitmap_size(MAX_NUMBER , ERROR_RATE , &hash);
     unsigned long long ret = (unsigned long long)m;
     ret = ALIGN_TO_BYTE(ret) / 8;;
-
+    printf("%lld items , Min bitmap size is %lf KBytes , hash functions %d\n" , 
+            MAX_NUMBER , ret / (double)(1024) , hash);
+    
+    ret *= 4;
     char *bitmap = (char *)calloc(ret , sizeof(char));
     if(NULL == bitmap)
     {
