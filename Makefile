@@ -6,3 +6,6 @@ bm : test_bloom_filter.c HashFunc.h HashFunc.c test_hash.c
 
 kmp : search_test.c Search.c Search.h
 	gcc -o search_test search_test.c Search.c ${flags}
+
+rotate : rotate_string.c
+	gcc -o rotate rotate_string.c ${flags}
