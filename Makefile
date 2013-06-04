@@ -12,3 +12,10 @@ rotate : rotate_string.c
 
 diff : find_diff_number.c
 	gcc -o find_diff find_diff_number.c ${flags}
+
+sub : sub_right_max.c
+	gcc -o right_sub sub_right_max.c  ${flags}
+
+int : str_to_int.c
+	gcc -o str_to_int str_to_int.c ${flags}
+
