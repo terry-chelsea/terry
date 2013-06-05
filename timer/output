@@ -1,0 +1,86 @@
+A alerm id 1 will expired 6 times and per 8.5537
+Root expire time : 1366769063.670917
+Alarm id 1 ideal expire timeout : 1366769063.671082 -- and NOW : 1366769063.671099 Counter 1
+A alerm id 2 will expired 5 times and per 1.6718
+Root expire time : 1366769064.677865
+Alarm id 2 ideal expire timeout : 1366769065.684655 -- and NOW : 1366769064.678005 Counter 2
+A alerm id 3 will expired 2 times and per 4.1836
+Root expire time : 1366769065.684762
+Alarm id 2 ideal expire timeout : 1366769066.691373 -- and NOW : 1366769065.684898 Counter 3
+A alerm id 4 will expired 3 times and per 3.1436
+Root expire time : 1366769066.691657
+Alarm id 2 ideal expire timeout : 1366769067.698091 -- and NOW : 1366769066.691780 Counter 4
+A alerm id 5 will expired 4 times and per 8.4388
+Root expire time : 1366769067.698536
+Alarm id 2 ideal expire timeout : 1366769068.704809 -- and NOW : 1366769067.698675 Counter 5
+A alerm id 6 will expired 6 times and per 0.43
+Root expire time : 1366769067.698764
+Alarm id 6 ideal expire timeout : 1366769067.699049 -- and NOW : 1366769067.699015 Counter 6
+A alerm id 7 will expired 4 times and per 7.7223
+Root expire time : 1366769067.699096
+Alarm id 6 ideal expire timeout : 1366769067.699092 -- and NOW : 1366769067.699359 Counter 7
+A alerm id 8 will expired 6 times and per 4.5689
+Root expire time : 1366769067.699440
+Alarm id 6 ideal expire timeout : 1366769067.699135 -- and NOW : 1366769067.699844 Counter 8
+A alerm id 9 will expired 1 times and per 1.6725
+Root expire time : 1366769067.699925
+Alarm id 6 ideal expire timeout : 1366769067.699178 -- and NOW : 1366769067.700285 Counter 9
+A alerm id 10 will expired 1 times and per 6.877
+Root expire time : 1366769067.700366
+Alarm id 6 ideal expire timeout : 1366769067.699221 -- and NOW : 1366769067.700718 Counter 10
+Root expire time : 1366769067.700800
+Alarm id 6 ideal expire timeout : 1366769067.699264 -- and NOW : 1366769067.701155 Counter 11
+Root expire time : 1366769068.679886
+Alarm id 3 ideal expire timeout : 1366769112.700128 -- and NOW : 1366769068.680028 Counter 12
+Root expire time : 1366769068.686381
+Alarm id 4 ideal expire timeout : 1366769104.703644 -- and NOW : 1366769068.686496 Counter 13
+Root expire time : 1366769068.705433
+Alarm id 2 ideal expire timeout : 1366769077.765271 -- and NOW : 1366769068.705535 Counter 14
+Root expire time : 1366769068.706620
+Alarm id 9 ideal expire timeout : 1366769082.800810 -- and NOW : 1366769068.706726 Counter 15
+Root expire time : 1366769071.676678
+Alarm id 1 ideal expire timeout : 1366769183.754137 -- and NOW : 1366769071.676810 Counter 16
+Root expire time : 1366769071.687971
+Alarm id 4 ideal expire timeout : 1366769116.709388 -- and NOW : 1366769071.688085 Counter 17
+Root expire time : 1366769071.705117
+Alarm id 8 ideal expire timeout : 1366769139.801867 -- and NOW : 1366769071.705224 Counter 18
+Root expire time : 1366769072.681903
+Alarm id 3 ideal expire timeout : 1366769140.712980 -- and NOW : 1366769072.682038 Counter 19
+Root expire time : 1366769073.701231
+Alarm id 10 ideal expire timeout : 1366769187.717930 -- and NOW : 1366769073.701369 Counter 20
+Root expire time : 1366769074.689560
+Alarm id 4 ideal expire timeout : 1366769128.715132 -- and NOW : 1366769074.689698 Counter 21
+Root expire time : 1366769074.696212
+Alarm id 5 ideal expire timeout : 1366769242.788393 -- and NOW : 1366769074.696323 Counter 22
+Root expire time : 1366769074.706289
+Alarm id 7 ideal expire timeout : 1366769228.865236 -- and NOW : 1366769074.706399 Counter 23
+Root expire time : 1366769079.682386
+Alarm id 1 ideal expire timeout : 1366769247.798433 -- and NOW : 1366769079.682519 Counter 24
+Root expire time : 1366769081.713661
+Alarm id 7 ideal expire timeout : 1366769242.879682 -- and NOW : 1366769081.713792 Counter 25
+Root expire time : 1366769082.700749
+Alarm id 5 ideal expire timeout : 1366769274.805945 -- and NOW : 1366769082.700876 Counter 26
+Root expire time : 1366769087.688094
+Alarm id 1 ideal expire timeout : 1366769271.815044 -- and NOW : 1366769087.688223 Counter 27
+Root expire time : 1366769088.721054
+Alarm id 7 ideal expire timeout : 1366769263.901351 -- and NOW : 1366769088.721180 Counter 28
+Root expire time : 1366769090.711755
+Alarm id 5 ideal expire timeout : 1366769298.819109 -- and NOW : 1366769090.711892 Counter 29
+Root expire time : 1366769095.693799
+Alarm id 1 ideal expire timeout : 1366769295.831655 -- and NOW : 1366769095.693931 Counter 30
+Root expire time : 1366769095.728489
+Alarm id 7 ideal expire timeout : 1366769284.923020 -- and NOW : 1366769095.728591 Counter 31
+Root expire time : 1366769098.716320
+Root expire time : 1366769075.710951
+Alarm id 8 ideal expire timeout : 1366769195.881513 -- and NOW : 1366769098.716469 Counter 32
+Alarm id 5 ideal expire timeout : 1366769330.836661 -- and NOW : 1366769098.716510 Counter 33
+Root expire time : 1366769102.722198
+Alarm id 8 ideal expire timeout : 1366769203.892891 -- and NOW : 1366769102.722316 Counter 34
+Root expire time : 1366769103.699507
+Alarm id 1 ideal expire timeout : 1366769335.859340 -- and NOW : 1366769103.699635 Counter 35
+Root expire time : 1366769106.728045
+Alarm id 8 ideal expire timeout : 1366769211.904269 -- and NOW : 1366769106.728166 Counter 36
+Root expire time : 1366769110.733895
+Alarm id 8 ideal expire timeout : 1366769215.909958 -- and NOW : 1366769110.734026 Counter 37
+Root expire time : 1366769114.739755
+Alarm id 8 ideal expire timeout : 1366769219.915647 -- and NOW : 1366769114.739883 Counter 38
