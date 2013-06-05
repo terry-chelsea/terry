@@ -1,0 +1,13 @@
+package CA;
+
+message pb_MSG_SYS_CA_USER_LOGIN
+{
+    required string name = 1;
+}
+
+message pb_MSG_SYS_CA_USER_LOGIN_ACK
+{
+    required string token = 1;
+    required string password = 2;
+    required uint64 user_id = 3;
+}
