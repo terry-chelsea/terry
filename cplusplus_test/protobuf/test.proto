@@ -1,0 +1,16 @@
+package terry;
+
+message person
+{
+    required uint32  age = 1;
+    required uint32  weigh = 2;
+    required string  team = 3;
+    required string  name = 4;
+};
+
+message team
+{
+    repeated string  playes = 1;
+    required uint32  older = 2;
+    required string  name = 3;
+};
