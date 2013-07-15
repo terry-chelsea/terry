@@ -13,11 +13,11 @@ typedef RET_TYPE (* HASH_FUNC) (char * , int);
 
 #define ALIGN_SIZE      (sizeof(RET_TYPE) * 8 - 1)
 #define ERROR_RET       0
-static int __i__ = 0;
+extern int __i__i__;
 
 /* loop get each hash result , and store them to p provided by user */
 #define for_each_result_in(p , handler)  \
-        for(__i__ = 0 ; (handler != NULL) && (__i__ < handler->m_hashFuncNum) && ((p = (handler->m_resultArray)[__i__]) || 0x1) ; ++ __i__)
+        for(__i__i__ = 0 ; (handler != NULL) && (__i__i__ < handler->m_hashFuncNum) && ((p = (handler->m_resultArray)[__i__i__]) || 0x1) ; ++ __i__i__)
 #define for_each_result(str , size , p) \
     generateNResult(str , size); \
     for_each_result_in(p , getObjHandler())
@@ -42,7 +42,7 @@ typedef struct
 	RET_TYPE m_resultArray[MAX_HASH_NUMBER];
 }HASH_FUNC_OBJ;
 
-static HASH_FUNC_OBJ *ojb;
+extern HASH_FUNC_OBJ *ojb;
 
 extern int createHashFuncObj(int);
 
@@ -100,47 +100,6 @@ RET_TYPE MY3HashFunc(char * , int);
 
 RET_TYPE MY4HashFunc(char * , int);
 
-static HASH_FUNC hashFunc[MAX_HASH_NUMBER] = {
-    //12 : 17909.400 : 2.303
-	ANOHashFunc ,
-    //4 : 17884.600 : 2.479
-	BKDR1HashFunc ,
-    //1 : 17948.200 : 2.765
-	JSHashFunc , 
-    //15 : 17956.400 : 2.434
-	BKDR4HashFunc ,
-    //6 : 17985.600 : 2.465
-	DJBHashFunc ,
-    //3 : 17875.000 : 3.217
-	ELFHashFunc ,
-    //5 : 17974.000 : 2.459
-	SDBMHashFunc ,
-    //16 : 18017.600 : 2.340
-	BKDR5HashFunc ,
-    //8 : 17966.400 : 2.644
-	APHashFunc ,
-    //14 : 18056.000 : 2.436
-	BKDR3HashFunc ,
-    //13 : 18100.800 : 2.434
-	BKDR2HashFunc ,
-    //7 : 18020.400 : 2.216
-	DEKHashFunc ,
-    //11 : 18030.200 : 2.420
-	MYSQL2HashFunc ,
-    //17 : 18035.000 : 2.282
-	MY2HashFunc ,
-    //0 : 18015.000 : 2.786
-	RSHashFunc ,    
-    //2 : 18028.800 : 2.645
-	AP2HashFunc ,
-    //10 : 21657.000 : 2.491
-	MYSQL1HashFunc ,
-    //9 : 32744.000 : 2.029
-	SSLHashFunc ,
-    //18 : 19548.200 : 2.590
-	MY3HashFunc ,
-    //19 : 19592.000 : 2.678
-	MY4HashFunc	
-};
+extern HASH_FUNC hashFunc[MAX_HASH_NUMBER];
 
 #endif

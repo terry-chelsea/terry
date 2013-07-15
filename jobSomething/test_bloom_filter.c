@@ -41,7 +41,7 @@ double nsqrt(double val , unsigned int n)
         powv = pow(mid , n);
     }
 
-//    printf("pow(%lf , %d) = %lf  compare %lf\n" , mid , n , pow(mid , n) , val);
+    printf("pow(%lf , %d) = %lf  compare %lf\n" , mid , n , pow(mid , n) , val);
     return mid;
 }
 
@@ -66,6 +66,9 @@ double cal_bitmap_size(unsigned long long set_size , double err_rate , int *hash
 }
 
 unsigned long long count = 0;
+static int error_counter = 0;
+static int bigger_counter = 0;
+static int less_counter = 0;
 //UNbelieve BUG !!!
 //在下面的宏定义中，不能使用temp作为临时变量，因为它会覆盖之前的值
 //而且导致n的值总是0！！！这是为什么？！！！
@@ -164,12 +167,12 @@ unsigned int __test_num = 0;
                     __test_num-__failed_tests, __failed_tests); \
     if (__failed_tests) { \
         fprintf(stderr , "=== WARNING === We have failed tests here...\n"); \
-        exit(1); \
     } \
 } while(0)
 
 
 #define MAX_VALUE 0xFFFFFFFFU
+#define MAX_MOD  (RAND_MAX- MAX_NUMBER)
 #define IS_SUCCEED(num) ((num >= 10) && (num <= MAX_NUMBER))
 //如果a为真，b为真，返回真
 //如果a为假，b为假，返回真
@@ -196,14 +199,20 @@ void start_test(char *bm , int sz)
             int check_ret = check_number(bm , sz , input);
             if(ret)
             {
+                less_counter ++;
+                printf("-----------------number : %d----------------\n" , input);
                 if(!check_ret)
                     fprintf(stderr , "Never Happened !!! Number %d FAILED !\n" , input);
                 test_cond("str" , check_ret);
             }
             else 
             {
+                bigger_counter ++;
                 if(check_ret)
+                {
                     fprintf(stderr , "Number %d FAILED !\n" , input);
+                    ++ error_counter;
+                }
                 test_cond("str" , !check_ret);
             }
 
@@ -213,19 +222,45 @@ void start_test(char *bm , int sz)
     }
 
     test_report();
+    printf("Out range counter : %d and in range counter : %d , error counter : %d\n" , 
+            bigger_counter , less_counter , error_counter);
 }
 
 
-int test_bloom_filter()
+int test_bloom_filter(char *filename)
 {
+#ifdef TEST_STRING
+    if(NULL == filename)
+        filename = GENERATE_FILE;
+    FILE *fp = NULL;
+    if((fp = fopen(filename , "r")) < 0)
+    {
+        perror("open file failed : ");
+        return -1;
+    }
+
+    char line[LINE_LENGTH];
+    if(fgets(line , LINE_LENGTH - 1 , fp) == NULL)
+    {
+        printf("No line infomations , check file %s...\n" , filename);
+        return -1;
+    }
+    int len = strlen(line);
+    if(line[len - 1] = '\n')
+        line[-- len] = '\0';
+
+    int counter = atoi(line);
+#else
+    int counter = MAX_NUMBER;
+#endif
     int hash = 0;
-    double m = cal_bitmap_size(MAX_NUMBER , ERROR_RATE , &hash);
+    double m = cal_bitmap_size(counter , ERROR_RATE , &hash);
     unsigned long long ret = (unsigned long long)m;
-    ret = ALIGN_TO_BYTE(ret) / 8;;
+    ret = ALIGN_TO_BYTE(ret) / 8;
     printf("%lld items , Min bitmap size is %lf KBytes , hash functions %d\n" , 
-            MAX_NUMBER , ret / (double)(1024) , hash);
+            counter , ret / (double)(1024) , hash);
     
-    ret *= 4;
+    ret *= 2;
     char *bitmap = (char *)calloc(ret , sizeof(char));
     if(NULL == bitmap)
     {
@@ -297,9 +332,10 @@ int generate_test_numbers(char *cnts)
     int counter = atoi(cnts);
     for(i = 0 ; i < counter ; ++ i)
     {
-        int rdm = rand();
+        int rdm = rand() % (MAX_MOD) + MAX_NUMBER;
         int len = snprintf(str , 32 - 1 , "%d" , rdm);
-        str[len - 1] = '\n';
+        str[len] = '\n';
+        ++ len;
         if(write(fd , str , len) != len)
         {
             perror("write random data to file failed : ");
@@ -310,6 +346,56 @@ int generate_test_numbers(char *cnts)
 RET :
     close(fd);
     return 0;
+}
+
+#define LINE_LENGTH  40
+const char characters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const int  glength = sizeof(characters) - 1;
+
+void random_string(char line[])
+{
+    int i = 0;
+    for(i = 0 ; i < LINE_LENGTH ; ++i)
+        line[i] = characters[rand() % glength];
+
+    line[LINE_LENGTH] = '\n';
+}
+
+void generate_string_file(char *lines , char *filename)
+{
+    srand(time(NULL));
+
+    int fd = open((NULL == filename) ? GENERATE_FILE : filename , O_WRONLY | O_CREAT | O_TRUNC | O_APPEND , 0644);
+    if(fd < 0)
+    {
+        perror("open generate file failed !\n");
+        return ;
+    }
+   int chooses = atoi(lines);
+   int i = 0;
+   char buf[LINE_LENGTH + 1];
+   int len = snprintf(buf , LINE_LENGTH , "%d" , chooses);
+   buf[len ++] = '\n';
+
+   if(write(fd , buf , len) != len)
+   {
+       perror("write all lines number failed : ");
+       goto ERR;
+   }
+
+   chooses = chooses << 1;
+   for(i = 0 ; i < chooses ; ++ i)
+   {
+       random_string(buf);
+       if(write(fd , buf , LINE_LENGTH + 1) != LINE_LENGTH + 1)
+       {
+           perror("Write string to failed : ");
+           break;
+       }
+   }
+
+ERR:
+    close(fd);
 }
 
 
@@ -333,8 +419,17 @@ int main(int argc , char *argv[])
             generate_test_numbers(argv[2]);
             break;
 
+        case 3:
+            if(argc < 3)
+            {
+                printf("./Usage : ./test SHA1-numbers [filename]\n");
+                break;
+            }
+            generate_string_file(argv[2] , argv[3]);
+            break;
+
         default :
-            test_bloom_filter();
+            test_bloom_filter(argv[1]);
             break;
     }
 

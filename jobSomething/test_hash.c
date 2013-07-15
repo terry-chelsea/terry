@@ -28,7 +28,7 @@ int main()
         printf("NO.%d hash result : %u\n" , ++i , temp);
     }
 
-    printf("--------------------------------------\n" , i = 0);
+    printf("--------------------------------------\n");
 
     num1 = rand() % MAX;
     snprintf(str , 16 , "%d" , num1);

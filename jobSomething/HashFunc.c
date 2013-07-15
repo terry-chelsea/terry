@@ -2,6 +2,51 @@
 
 HASH_FUNC_OBJ *obj = NULL;
 
+HASH_FUNC hashFunc[MAX_HASH_NUMBER] = {
+    //12 : 17909.400 : 2.303
+	ANOHashFunc ,
+    //4 : 17884.600 : 2.479
+	BKDR1HashFunc ,
+    //1 : 17948.200 : 2.765
+	JSHashFunc , 
+    //15 : 17956.400 : 2.434
+	BKDR4HashFunc ,
+    //6 : 17985.600 : 2.465
+	DJBHashFunc ,
+    //3 : 17875.000 : 3.217
+	ELFHashFunc ,
+    //5 : 17974.000 : 2.459
+	SDBMHashFunc ,
+    //16 : 18017.600 : 2.340
+	BKDR5HashFunc ,
+    //8 : 17966.400 : 2.644
+	APHashFunc ,
+    //14 : 18056.000 : 2.436
+	BKDR3HashFunc ,
+    //13 : 18100.800 : 2.434
+	BKDR2HashFunc ,
+    //7 : 18020.400 : 2.216
+	DEKHashFunc ,
+    //11 : 18030.200 : 2.420
+	MYSQL2HashFunc ,
+    //17 : 18035.000 : 2.282
+	MY2HashFunc ,
+    //0 : 18015.000 : 2.786
+	RSHashFunc ,    
+    //2 : 18028.800 : 2.645
+	AP2HashFunc ,
+    //10 : 21657.000 : 2.491
+	MYSQL1HashFunc ,
+    //9 : 32744.000 : 2.029
+	SSLHashFunc ,
+    //18 : 19548.200 : 2.590
+	MY3HashFunc ,
+    //19 : 19592.000 : 2.678
+	MY4HashFunc	
+};
+
+int __i__i__ = 0;
+
 RET_TYPE RSHashFunc(char *str , int size)
 {
 	int b = 378551;
@@ -146,7 +191,7 @@ RET_TYPE AP(char * str , int size , RET_TYPE init)
 		}
 		else
 		{
-			hash ^= (~((hash << 11) + str[i] ^ (hash >> 5)));	
+			hash ^= (~((hash << 11) + ((str[i]) ^ (hash >> 5))));	
 		}
 	}
 	return hash;
@@ -166,7 +211,6 @@ RET_TYPE SSLHashFunc(char * str , int size)
 {
 	int halfSize = (size + 1) / 2;
 	RET_TYPE hash = 0;
-	unsigned short *ptr = NULL;
 	int i = 0;
 	for(i = 0 ; i < halfSize ; ++ i)
 	{

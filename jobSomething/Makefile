@@ -19,3 +19,9 @@ sub : sub_right_max.c
 int : str_to_int.c
 	gcc -o str_to_int str_to_int.c ${flags}
 
+words : find_similar_words.c
+	gcc -o find_words find_similar_words.c ${flags}
+
+odd : get_odd_number.c
+	gcc -o odd_number get_odd_number.c ${flags} -lm -lpthread
+
