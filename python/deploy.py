@@ -15,6 +15,7 @@ mysql_dir = "/usr/local/mysql/"
 mysql_version = "5.1.48"
 mysql_installed = False
 odbc_deployed = False
+ngnix_deployed = False
 
 def execute_cmd(cmd , flag = 1 , out = temp_file_name) :
     print "start " , cmd , " ..."
@@ -152,6 +153,7 @@ def install_mysql() :
     else :
         cnt = wait_to_continue("MySQL has been installed...")
         if(0 == cnt) :
+	    mysql_installed = True
             return ;
         else :
             sys.exit(-1)
@@ -188,8 +190,24 @@ def get_sock_path() :
 	execute_cmd("mkdir -p " + "/var/lib/mysql/")
         execute_cmd("ln -s " + varpath + " " + tmppath , 0)
 
+def check_odbc(flags) :
+    if(odbc_deployed) : 
+        return 0;
+
+    ret = 0;
+    cd_dir(deploy_root_dir + tool_dir)
+
+    execute_cmd("touch __tmpfile")
+    ret = execute_cmd("./isql test < ./__tmpfile" , flags)
+    execute_cmd("rm __tmpfile")
+    
+    return ret;
+
 def deploy_odbc() :
     global odbc_deployed
+    if(check_odbc(0) == 0) :
+        odbc_deployed = True
+        return ;
 
     libpath = odbcpath + "lib/"
     configpath = odbcpath + "etc/"
@@ -206,14 +224,10 @@ def deploy_odbc() :
 	sys.exit()
 
     execute_cmd("ldconfig")
-    cd_dir(deploy_root_dir + tool_dir)
-
 #assert mysql.sock is exist...
-    execute_cmd("touch __tmpfile")
-    execute_cmd("./isql test < ./__tmpfile")
-    execute_cmd("rm __tmpfile")
-
+    check_odbc(1);
     odbc_deployed = True
+    print "ODBC has deployed successfully..."
 
 
 cstore_deploy_path = "/opt/nsdl/cstore/deploy/"
@@ -269,6 +283,31 @@ def create_database(dbname) :
     execute_cmd("mysql -uroot -pmysql < ./" + temp_file_name)
     execute_cmd("rm " + temp_file_name)
 
+def check_nginx() :
+    cmd = "ps -e | grep nginx"
+    ret = execute_cmd(cmd , 0);
+    fp = open(temp_file_name);
+    all = fp.readlines();
+    if(len(all) == 0) :
+        return -1;
+    return 0;
+    
+
+def deploy_nginx() :
+    if(check_nginx() == 0) :
+	print "Nginx has been running..."
+        nginx_deployed = True
+        return ;
+
+    nginx_dir = deploy_root_dir + tool_dir + "nginx"
+    execute_cmd("cp -r " + nginx_dir + " /usr/local")
+    execute_cmd("/usr/local/nginx/sbin/nginx")
+
+    if(check_nginx() != 0) :
+        print "Nginx install failed..."
+        sys.exit(-1)
+
+    nginx_deployed = True
 
 #cs need mysql...
 def deploy_one_module(module) :
@@ -286,6 +325,10 @@ def deploy_one_module(module) :
     if(module in modules[0 : 2]) :
         if(not odbc_deployed) :
             deploy_odbc()
+
+    if(module == modules[4]) :
+        if(not ngnix_deployed) :
+            deploy_nginx()
 
     cd_dir(deploy_root_dir + module_dir)
     one_libs = []
