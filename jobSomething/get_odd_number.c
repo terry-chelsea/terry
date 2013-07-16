@@ -20,8 +20,8 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define MAX_VALUE  10000000
-#define TEST_NUM  1000
+#define MAX_VALUE  100000
+#define TEST_NUM  10000
 
 //#define USE_REC
 
@@ -132,7 +132,7 @@ int main()
 
     gettimeofday(&start , NULL);
 
-#ifndef MAIN_THREAD
+#ifdef MAIN_THREAD
     complete_all_task_in_main_thread(TEST_NUM);
 #else
     complete_all_task_in_threads(TEST_NUM);
