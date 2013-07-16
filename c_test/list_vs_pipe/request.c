@@ -2,6 +2,7 @@
 #include "request.h"
 #include <math.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 static int is_odd(int num)
 {
@@ -74,3 +75,24 @@ void delete_a_request(REQ *req)
     if(NULL != req)
         free(req);
 }
+
+//just test how long it will takes in a single thread...
+void test_requests(int num , int max_value)
+{
+    struct timeval start , end;
+    gettimeofday(&start , NULL);
+
+    int i = 0;
+    for(i = 0 ; i < num ; ++ i)
+    {
+        REQ *req = create_a_request(rand() % max_value);
+        do_one_request(req);
+        delete_a_request(req);
+        req = NULL;
+    }
+    gettimeofday(&end , NULL);
+    double gap = 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
+    
+    printf("%lf\n" , gap / 1000000);
+}
+
