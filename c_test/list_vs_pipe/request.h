@@ -21,8 +21,6 @@
 #ifndef _H_ONLY_REQUEST_AND_PRIME_H_
 #define _H_ONLY_REQUEST_AND_PRIME_H_
 
-#include <stdio.h>
-
 typedef struct 
 {
     int source;
@@ -35,7 +33,6 @@ REQ *create_a_request(int num);
 
 void delete_a_request(REQ *req);
 
-void test_requests(int num , int max_value);
-
+#define MAX_REQUEST 10000
 
 #endif
