@@ -1,12 +1,16 @@
 flags = -g -O0 -Wall -Werror
-list : thread_test.c nlist
+all = thread_test normal_list.o listline request.o
+list : thread_test.c normal_list.o
 	gcc -o thread_test thread_test.c normal_list.o ${flags} -lpthread -DTHREADS -DATOMIC 
 
-nlist : normal_list.h normal_list.c
+normal_list.o : normal_list.h normal_list.c
 	gcc -c normal_list.c ${flags} -lpthread -DDOUBLE_LOCK_
 
-listline : listline.c nlist request
-	gcc -o listline listline.c normal_list.o request.o ${flags} -lpthread -lm -DATOMIC -DDEBUG_
+listline : listline.c normal_list.o  request.o
+	gcc -o listline listline.c normal_list.o request.o ${flags} -lpthread -lm -DATOMIC -DDEBUG 
 
-request : request.h request.c
-	gcc -c request.c ${flags} -lm 
+request.o : request.h request.c
+	gcc -c request.c ${flags} -lm -lpthread
+
+clean :
+	rm ${all}

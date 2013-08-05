@@ -44,33 +44,13 @@ static int recv_request = 0;     //debug info : all recv requests...
 
 #define READ_INTERVAL 100
 #define MAX_NUMBER 100000
+#define MAX_REQUEST 10000
 #define THREAD_NUM  4
 
-#ifdef DEBUG
+#ifdef DEBUG_IN
 int requests = 0;
 double all_time = 0.0;
 pthread_mutex_t debug_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-//just test how long it will takes in a single thread...
-void test_requests(int num)
-{
-    struct timeval start , end;
-    gettimeofday(&start , NULL);
-
-    int i = 0;
-    for(i = 0 ; i < num ; ++ i)
-    {
-        REQ *req = create_a_request(rand() % MAX_NUMBER);
-        do_one_request(req);
-        delete_a_request(req);
-        req = NULL;
-    }
-    gettimeofday(&end , NULL);
-    double gap = 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
-
-    printf("Test %d requests cost : %lf millseconds...\n" , num , gap / 1000);
-}
-
 #endif
 
 void *start_task(void *arg);
@@ -78,7 +58,11 @@ int check_results(int fiags);
 int main()
 {
 #ifdef DEBUG
-    test_requests(MAX_REQUEST);
+#ifdef MTHREAD
+    test_requests_with_threads(MAX_REQUEST , THREAD_NUM , MAX_NUMBER);
+#else
+    test_requests(MAX_REQUEST , MAX_NUMBER);
+#endif
     return 0;
 #endif
     struct timeval start , end;
@@ -120,7 +104,9 @@ int main()
                 printf("Something wrong while get results...\n");
                 return -1;
             }
-//            printf("get result : %d\n" , ret);
+#ifdef DEBUG_IN
+            printf("get result : %d\n" , ret);
+#endif
 
             recv_request += ret;
         }
@@ -140,11 +126,13 @@ int main()
 
         ++ send_request;
     }
-//    gettimeofday(&end , NULL);
-//    CALCULATE_TIME(start , end);
-//    printf("send %d and recv result %d\n" , send_request , recv_request);
+#ifdef DEBUG_IN
+    gettimeofday(&end , NULL);
+    CALCULATE_TIME(start , end);
+    printf("send %d and recv result %d\n" , send_request , recv_request);
 
-//    gettimeofday(&start , NULL);
+    gettimeofday(&start , NULL);
+#endif
 
     while(recv_request != send_request)
     {
@@ -157,8 +145,10 @@ int main()
 
         recv_request += ret;
 
-//        printf("send %d and recv %d\n" , send_request , recv_request);
-//        list_state(recv_list);
+#ifdef DEBUG_IN
+        printf("send %d and recv %d\n" , send_request , recv_request);
+        list_state(recv_list);
+#endif
     }
 
     list_destory(&send_list);
@@ -166,12 +156,17 @@ int main()
     close(_eventfd);
     _eventfd = 0;
 
-#ifdef DEBUG
+#ifdef DEBUG_IN
     printf("all requests : %d and all cost time : %lf\n" , requests , all_time);
-#endif
-
     gettimeofday(&end , NULL);
     CALCULATE_TIME(start , end);
+#else 
+    gettimeofday(&end , NULL);
+    double gap = 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
+
+    printf("%lf\n" , gap / 1000000);
+#endif
+
 
     return 0;
 }
@@ -191,7 +186,7 @@ void *start_task(void *arg)
 
         REQ *req = (REQ *)elem;
 
-#ifdef DEBUG
+#ifdef DEBUG_IN
         struct timeval start , end;
         gettimeofday(&start , NULL);
         req = do_one_request(req);

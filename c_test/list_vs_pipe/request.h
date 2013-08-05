@@ -33,6 +33,9 @@ REQ *create_a_request(int num);
 
 void delete_a_request(REQ *req);
 
-#define MAX_REQUEST 10000
+void test_requests_with_threads(int nums , int thread_num , int max_value);
+
+void test_requests(int num , int max_value);
+
 
 #endif
