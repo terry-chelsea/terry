@@ -25,3 +25,8 @@ words : find_similar_words.c
 odd : get_odd_number.c
 	gcc -o odd_number get_odd_number.c ${flags} -lm -lpthread
 
+min_max : find_max_and_min.c 
+	gcc -o min_max find_max_and_min.c ${flags}
+
+swap_list : swap_list.c
+	gcc -o swap_list swap_list.c ${flags}

@@ -1,13 +1,24 @@
 #!/usr/bin/python
+#coding=utf-8
+
+#该文件用来使用生成的user目录下的文件产生实际的MU和SU数据
+#对于MU需要的数据时一个目录树，下面有多个桶构成的子目录树，每个桶又是由多个用户构成的
+#使用网络的方式创建MU数据
+#对于SU需要的是数据库信息，使用远程MYSQL的方式在本地进行操作...
+#对于每个节点，使用一个线程与其保持连接...
 
 import xml.etree.ElementTree
 import sys
+import os
 import socket
 import struct
+import thread
+import threading
+import pdb
 
 mu = "MU"
 su = "SU"
-user_directory = "./users/"
+user_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
 server_port = 12345
 
 def parse_MU_or_SU(doc , root) : 
@@ -111,7 +122,7 @@ def connect_all_nodes(config) :
         if err : 
             print "Connect to " , ip , " and port " , server_port , " failed ..."
             for sock in all_sockets : 
-                sock.close()
+                all_sockets[sock].close()
             return 
         all_sockets[ip] = socket_
 
@@ -125,13 +136,14 @@ send_SU_command = 3
 finish_send_all_job_command = 4
 finish_all_job_command = 5
 
-def get_all_buckets(cmd , rule , ip , socket_) : 
+def send_all_buckets(cmd , rule , ip , socket_) : 
     bucket_nr = 0
     this_ip_buckets = []
     for i in rule : 
         if ip in i : 
             this_ip_buckets.append(bucket_nr)
         bucket_nr += 1
+    print this_ip_buckets
 
 #if this is a server , have some rules...
     try : 
@@ -149,16 +161,17 @@ def get_all_buckets(cmd , rule , ip , socket_) :
     return 0
 
         
+#only send MU rules , SU data generated here...
 def send_rule_to_node(sockets , rules) : 
     for ip in sockets : 
         ret = send_all_buckets(send_MU_rule_command , rules[0] , ip , sockets[ip])
         if ret : 
             print "Send MU rule to " , ip , " failed ..."
             return -1
-        ret = send_all_buckets(send_SU_command , rules[1] , ip , sockets[ip])
-        if ret : 
-            print "Send SU rule to " , ip , " failed ..."
-            return -1
+#        ret = send_all_buckets(send_SU_command , rules[1] , ip , sockets[ip])
+#        if ret : 
+#            print "Send SU rule to " , ip , " failed ..."
+#            return -1
 
 def get_mu_bucket_nr(user_id , all_buckets) : 
     return user_id % all_buckets
@@ -170,9 +183,9 @@ def get_su_bucket_nr(infohash , all_buckets) :
 
     return value % all_buckets
 
-def send_all_users_info_to_server(users , sockets , rules) : 
-    mu_buckets_num = len(rules[0])
-    su_buckets_num = len(rules[1])
+# only send MU data , this is all user file data ...
+def send_all_MU_date_to_server(users , sockets , rules) : 
+    mu_buckets_num = len(rules)
 
     for user in users : 
         try :
@@ -180,45 +193,23 @@ def send_all_users_info_to_server(users , sockets , rules) :
         except IOError : 
             print "Open file " , user_directory + user , " failed ..."
             return -1
-
-        line = 0
-        block_line = 0
-        # all file datas ...
-        file_data = ""
-        for data in fp.readlines() : 
-            file_data += data
-            line += 1
-            if block_line > 0 : 
-                block_line -= 1
-                infohash = data.strip()
-                if(len(infohash) != 40) : 
-                    print "line " , line , " in  file " , file , " not illegal ... "
-                    return -1
-                else : 
-                   nr =  get_su_bucket_nr(infohash , su_buckets_num)
-                   try :
-                       # send every infohash to all SU nodes ...
-                       header = struct.pack("ii" , send_SU_command , len(infohash))
-                       info = header + infohash
-                       for ip in rules[1][nr] : 
-                           sockets[ip].sendall(info)
-                   except socket.error : 
-                       print "Send infohash " , infohash , " in user " , user , " to Su node " , ip , " failed ..."
-                       return -1
-            else : 
-                block_line = int(data)
         
+        file_data = fp.read()
         # send all file content to MU and 
         user_id = int(user)
-        header = struct.pack("iii" , send_MU_command , user_id , len(file_data))
+        header = struct.pack("iii" , send_MU_command , len(file_data) , user_id)
         nr = get_mu_bucket_nr(user_id , mu_buckets_num)
         info = header + file_data
         try : 
-            for ip in rules[0][nr] : 
+            for ip in {}.fromkeys(rules[nr]).keys() : 
                 sockets[ip].sendall(info)
         except socket.error : 
             print "Send file data of user " , user , " to MU " , ip , " failed ..."
+            fp.close()
             return -1
+        fp.close()
+
+        print "Send all file data of user " , user_id , " to node : " ,{}.fromkeys(rules[nr]).keys()
 
     try : 
         buf = struct.pack("ii" , finish_send_all_job_command , 0)
@@ -232,32 +223,78 @@ def send_all_users_info_to_server(users , sockets , rules) :
 
     return 0
 
+def deal_with_infohash(infohash) : 
+    return 
+#    print infohash
+
+def send_all_SU_data_to_server(users , sockets , rules) : 
+    su_buckets_num = len(rules)
+    su_counter = 0
+
+    for user in users : 
+        try :
+            fp = open(user_directory + user)
+        except Exception as e :
+            print "Open file " , user_directory + user , " failed : " , e
+            return -1
+
+        line = 1
+        block_line = 0
+        for data in fp.readlines() : 
+            if block_line > 0 : 
+                block_line -= 1
+                data = data.strip()
+                if(len(data) != 40) : 
+                    print "line " , line , " in  file " , file , " not illegal ... "
+                    fp.close()
+                    return -1
+                else : 
+                    if deal_with_infohash(data) : 
+                        print "Deal with infohash " , data , " failed ..."
+                        fp.close()
+                        return -1
+                    su_counter += 1
+            else : 
+                block_line = int(data.strip())
+
+            line += 1
+        
+        fp.close()
+
+    return su_counter
 
 socket_timeout = 5
 def wait_to_the_end(sockets) : 
     while sockets : 
+        alive_ips = 0
         for ip in sockets : 
-            try : 
-                sockets[ip].settimeout(socket_timeout)
-                buf = sockets[ip].recv(struct.calcsize("ii"))
-                if(len(buf) != struct.calcsize("ii")) : 
-                    print "recv data from node " , ip , " failed ..."
-                else : 
-                    cmd , err = struct.unpack("ii" , buf)
-                    if(cmd != finish_all_job_command) : 
-                        print "recv undefined command " , cmd , " from node " , ip
+            if(sockets[ip]) : 
+                alive_ips += 1
+                try : 
+                    sockets[ip].settimeout(socket_timeout)
+                    buf = sockets[ip].recv(struct.calcsize("ii"))
+                    if(len(buf) == 0) : 
+                        print "!!!!!!!!!!!!!get close infomation from " , ip
+                    if(len(buf) != struct.calcsize("ii")) : 
+                        print "recv data from node " , ip , " failed ..."
                     else : 
-                        if err == 0 : 
-                            print "Server in " , ip , "do job faied ..."
+                        cmd , err = struct.unpack("ii" , buf)
+                        if(cmd != finish_all_job_command) : 
+                            print "recv undefined command " , cmd , " from node " , ip
                         else : 
-                            print "Server in " , ip , " finish all jobs ..."
+                            if err != 0 : 
+                                print "Server in " , ip , "do job faied ..."
+                            else : 
+                                print "Server in " , ip , " finish all jobs ..."
+                    sockets[ip].close()
+                    sockets[ip] = None
                         
-                socket[ip].close()
-                del(socket[ip])
-                        
-            except socket.timeout : 
-                print "In last " , socket_timeout , " seconds , node " , ip , " not finish ..."
-                continue ;
+                except socket.timeout : 
+                    print "In last " , socket_timeout , " seconds , node " , ip , " not finish ..."
+                    continue ;
+
+        if alive_ips == 0 : 
+            break;
 
 
 #["SU" : (mod , node , [IPS...])]
@@ -287,23 +324,33 @@ if __name__ == "__main__" :
     if ret : 
         print "Send all rule to nodes failed ..."
         for sock in all_sockets : 
-            sock.close()
+            all_sockets[sock].close()
         sys.exit(-1)
     else : 
         print "Send all rule to server successfully..."
 
+#    pdb.set_trace() 
+
     all_users = os.listdir(user_directory)
     print "Get all users infomations successfully , There are " , len(all_users) , " users ..."
 
-    ret = send_all_users_info_to_server(all_users , all_sockets , all_rule)
+    ret = send_all_MU_date_to_server(all_users , all_sockets , all_rule[0])
     if ret : 
-        print "Send all user infomations to server failed ..."
+        print "Send all user(MU) infomations to server failed ..."
         for sock in all_sockets : 
-            sock.close()
+            all_sockets[sock].close()
         sys.exit(-1)
     else : 
-        print "Send all user infomations to server success ..."
+        print "Send all user(MU) infomations to server success ..."
 
     wait_to_the_end(all_sockets)
+
+#    cnt = send_all_SU_data_to_server(all_users , all_sockets , all_rule[1])
+    cnt = 1
+    if cnt < 0 :
+        print "send all Infohash infomations to servers failed ..."
+        sys.exit(-1)
+    else : 
+        print "Send all infohash to SU success , counter " , cnt
 
     print "all data deploy finish ..."

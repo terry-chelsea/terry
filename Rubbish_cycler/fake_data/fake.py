@@ -5,7 +5,7 @@ import random
 import os
 import time
 
-users_directory = "./users/"
+users_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
 user_max_number = 0
 block_size = 40
 thread_number = 20

@@ -7,6 +7,8 @@ import os
 import threading
 import time
 
+#generate fake data using SHA1...
+
 users_directory = "./users/"
 user_max_number = 0
 block_size = 20000
