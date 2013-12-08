@@ -1,0 +1,21 @@
+#!/usr/bin/sh
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
+./fake.py 30 1000 1 64 >/dev/null &
