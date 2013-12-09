@@ -15,11 +15,16 @@ import struct
 import thread
 import threading
 import pdb
+import MySQLdb
+import random
+import time
 
 mu = "MU"
 su = "SU"
-user_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
+#user_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
+user_directory = "./users/"
 server_port = 12345
+start_time = 0
 
 def parse_MU_or_SU(doc , root) : 
     MOD = "/MOD"
@@ -109,10 +114,21 @@ def assign_rule(config) :
 
     return (mu_rule , su_rule)
 
+def close_all_sockets(sockets) : 
+    for sock in sockets : 
+        sockets[sock].close()
+
+def close_all_connections(conns) : 
+    for ip in conns : 
+        conns[ip][0].close()
+        conns[ip][1].close()
+
+#["SU" : (mod , node , [IPS...])]
+
 def connect_all_nodes(config) : 
     all_node_ip = []
-    all_node_ip.extend(config[mu][2])
-    all_node_ip.extend(config[su][2])
+    all_node_ip.extend(config[2])
+#    all_node_ip.extend(config[su][2])
     # clear repeat IP...
     all_node_ip = {}.fromkeys(all_node_ip).keys()
     all_sockets = {}
@@ -121,8 +137,7 @@ def connect_all_nodes(config) :
         err = socket_.connect_ex((ip , server_port))
         if err : 
             print "Connect to " , ip , " and port " , server_port , " failed ..."
-            for sock in all_sockets : 
-                all_sockets[sock].close()
+            close_all_sockets(all_sockets)
             return 
         all_sockets[ip] = socket_
 
@@ -176,10 +191,13 @@ def send_rule_to_node(sockets , rules) :
 def get_mu_bucket_nr(user_id , all_buckets) : 
     return user_id % all_buckets
 
+hash_map = {'0' : 48 , '1' : 49 , '2' : 50 , '3' : 51 , '4' : 52 , \
+        '5' : 53 , '6' : 54 , '7' : 55 , '8' : 56 , '9' : 57 ,\
+                'a' : 97 , 'b' : 98 , 'c' : 99 , 'd' : 100 , 'e' : 101 , 'f' : 102}
 def get_su_bucket_nr(infohash , all_buckets) : 
     value = 1315423911
     for ch in infohash : 
-        value = (value << 5) + ch + (value >> 2)
+        value = (value << 5) + hash_map[ch] + (value >> 2)
 
     return value % all_buckets
 
@@ -223,11 +241,100 @@ def send_all_MU_date_to_server(users , sockets , rules) :
 
     return 0
 
-def deal_with_infohash(infohash) : 
-    return 
-#    print infohash
+su_database_port = 3306
+su_database_user = "root"
+su_database_pwd = "mysql"
+su_database_db = "su_test"
+su_bucket_table = "Bucket_Table"
+bucket_table_attr = "(Bucket_ID int not null primary key , Sequence bigint , Old_Sequence bigint , State int , Size bigint)engine=MyISAM DEFAULT CHARSET=utf8"
+su_mod_table = "Mod_Table"
+mod_table_attr = "(Mod_Num int primary key not null)DEFAULT CHARSET=utf8"
+su_bucket_prefix = "Block_Table_"
+infohash_table_attr = "(Key_Idx char(2) not null , Infohash varchar(64) primary key not null , Sequence bigint , Size int , Del int , \
+        Time bigint , Path varchar(255) , KEY `key_index` (`Key_Idx`))ENGINE=MyISAM , DEFAULT CHARSET=utf8"
+create_table_prefix = "create table "
+insert_table_prefix = "insert into "
+update_table_prefix = "update "
+normal_size = 524288
+default_path = "/home/terry/su_root"
 
-def send_all_SU_data_to_server(users , sockets , rules) : 
+def deal_with_infohash(conn , infohash , bucket_nr) : 
+#    pdb.set_trace() 
+
+    size = normal_size
+    if random.randint(1 , 1000) == 0 : 
+        size = random.randint(1024 , normal_size)
+    try : 
+        insert_sql = insert_table_prefix + su_bucket_prefix + str(bucket_nr) + " values(%s , %s , %s , %s , %s , %s , %s)"
+        conn.execute(insert_sql , (infohash[0 : 2] , infohash , 0 , size , 0 , int(time.time()) , default_path))
+#        update_sql = update_table_prefix + su_bucket_table + " set Size = Size + %s where Bucket_ID = %s"
+#        conn.execute(update_sql , (size , bucket_nr))
+    except Exception as e : 
+        print "Execute insert and update an infohash , size " , size , " error : " , e 
+        return -1
+
+    return 0
+
+
+
+def connect_all_mysql(config) : 
+    su_ips = config[2]
+    su_ips = {}.fromkeys(su_ips).keys()
+    all_conns = {}
+    for ip in su_ips : 
+        try : 
+            conn = MySQLdb.connect(host = ip , port = 3306 , user = su_database_user , \
+                    passwd = su_database_pwd , db = su_database_db , charset = "utf8")
+        except Exception as e : 
+            close_all_connections(all_conns)
+            print "Create mysql connection error : " , e
+            return ()
+        all_conns[ip] = (conn , conn.cursor())
+
+    return all_conns
+
+
+def create_su_buckets(conns , rules) : 
+    bucket_table_sql = create_table_prefix + su_bucket_table  + bucket_table_attr
+    mod_table_sql = create_table_prefix + su_mod_table + mod_table_attr
+    
+    buckets = len(rules)
+    for ip in conns :
+        this_ip_buckets = []
+        for i in range(buckets) : 
+            for rule_ip in rules[i] : 
+                if(rule_ip == ip) : 
+                    this_ip_buckets.append(i)
+        cur = conns[ip][1]
+        try :
+            cur.execute(bucket_table_sql)
+            cur.execute(mod_table_sql)
+
+            for bucket in  this_ip_buckets : 
+                insert_sql = insert_table_prefix + su_bucket_table + " values(%s , %s , %s , %s , %s)"
+                cur.execute(insert_sql , (bucket , 0 , 0 , 0 , 0))
+            insert_sql = insert_table_prefix + su_mod_table + " values(%s)"
+            cur.execute(insert_sql , buckets)
+
+        except Exception as e : 
+            print "Execute create bucket table and mod table failed : " , e
+            return -1
+        
+    buckets = len(rules)
+    for nr in range(buckets) : 
+        infohash_table_sql = create_table_prefix + su_bucket_prefix + str(nr) + infohash_table_attr
+        for ip in rules[nr] : 
+            try : 
+                conns[ip][1].execute(infohash_table_sql)
+            except Exception as e : 
+                close_all_connections(conns)
+                print "Execute create infohash table failed : " , e
+                return -1
+    return 0
+
+def send_all_SU_data_to_server(users , conns , rules) : 
+    global start_time
+
     su_buckets_num = len(rules)
     su_counter = 0
 
@@ -248,12 +355,24 @@ def send_all_SU_data_to_server(users , sockets , rules) :
                     print "line " , line , " in  file " , file , " not illegal ... "
                     fp.close()
                     return -1
-                else : 
-                    if deal_with_infohash(data) : 
-                        print "Deal with infohash " , data , " failed ..."
-                        fp.close()
-                        return -1
+
+                nr = get_su_bucket_nr(data , su_buckets_num)
+                try : 
+                    for ip in {}.fromkeys(rules[nr]).keys() : 
+                        if deal_with_infohash(conns[ip][1] , data , nr) : 
+                            print "Deal with infohash " , data , " to node " , ip , " failed ..."
+                            fp.close()
+                            return -1
+
                     su_counter += 1
+                    if not su_counter % 10000 : 
+                        cur_time = int(time.time())
+                        print "finish insert " , su_counter , " infohashs , use %d seconds ..." %(cur_time - start_time)
+                        start_time = cur_time
+                except  Exception as e : 
+                    print "Send file data of user " , user , " to MU " , ip , " failed : " , e
+                    fp.close()
+                    return -1
             else : 
                 block_line = int(data.strip())
 
@@ -296,8 +415,6 @@ def wait_to_the_end(sockets) :
         if alive_ips == 0 : 
             break;
 
-
-#["SU" : (mod , node , [IPS...])]
 if __name__ == "__main__" : 
     if(len(sys.argv) != 2) : 
         print "./center config_file"
@@ -313,44 +430,58 @@ if __name__ == "__main__" :
 
     all_rule = assign_rule(config)
 
-    all_sockets = connect_all_nodes(config)
+#    all_sockets = connect_all_nodes(config[mu])
+    all_sockets = True
     if not all_sockets : 
         print "Connect to server failed ..."
         sys.exit(-1)
     else : 
         print "Connect to all server successfully..."
 
-    ret = send_rule_to_node(all_sockets , all_rule)
+#    ret = send_rule_to_node(all_sockets , all_rule)
+    ret = 0
     if ret : 
         print "Send all rule to nodes failed ..."
-        for sock in all_sockets : 
-            all_sockets[sock].close()
+        close_all_sockets(all_sockets)
         sys.exit(-1)
     else : 
         print "Send all rule to server successfully..."
 
-#    pdb.set_trace() 
-
     all_users = os.listdir(user_directory)
     print "Get all users infomations successfully , There are " , len(all_users) , " users ..."
 
-    ret = send_all_MU_date_to_server(all_users , all_sockets , all_rule[0])
+#    ret = send_all_MU_date_to_server(all_users , all_sockets , all_rule[0])
+    ret = 0
     if ret : 
         print "Send all user(MU) infomations to server failed ..."
-        for sock in all_sockets : 
-            all_sockets[sock].close()
+        close_all_sockets(all_sockets)
         sys.exit(-1)
     else : 
         print "Send all user(MU) infomations to server success ..."
 
-    wait_to_the_end(all_sockets)
+#    wait_to_the_end(all_sockets)
 
-#    cnt = send_all_SU_data_to_server(all_users , all_sockets , all_rule[1])
-    cnt = 1
+    all_conns = connect_all_mysql(config[su])
+    if not all_conns : 
+        print "Connect to mysqls failed ..."
+        sys.exit(-1)
+    else : 
+        print "Create connection to all mysqls success ..."
+
+    if create_su_buckets(all_conns , all_rule[1]) : 
+        print "Create all SU buckets failed ..."
+        sys.exit(-1)
+    else : 
+        print "Create all SU buckets success ..."
+
+    start_time = int(time.time())
+    cnt = send_all_SU_data_to_server(all_users , all_conns , all_rule[1])
     if cnt < 0 :
         print "send all Infohash infomations to servers failed ..."
         sys.exit(-1)
     else : 
         print "Send all infohash to SU success , counter " , cnt
+
+    close_all_connections(all_conns)
 
     print "all data deploy finish ..."

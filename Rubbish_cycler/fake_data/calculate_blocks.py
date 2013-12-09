@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 
 user_directory = "./users/"
 
@@ -30,6 +31,8 @@ def calculate_blocks(file) :
 
 if __name__ == "__main__" : 
     blocks = 0;
+    if len(sys.argv) >= 2 : 
+        user_directory = sys.argv[1]
     file_names = os.listdir(user_directory)
     for file in file_names : 
         lines = calculate_blocks(user_directory + file)
