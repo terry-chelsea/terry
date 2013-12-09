@@ -21,10 +21,10 @@ import time
 
 mu = "MU"
 su = "SU"
-#user_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
-user_directory = "./users/"
+user_directory = "/home/terry/Rubbish_recycler/fake_data/users/"
+#user_directory = "./users/"
 server_port = 12345
-start_time = 0
+start_time = int(time.time())
 
 def parse_MU_or_SU(doc , root) : 
     MOD = "/MOD"
@@ -127,8 +127,8 @@ def close_all_connections(conns) :
 
 def connect_all_nodes(config) : 
     all_node_ip = []
-    all_node_ip.extend(config[2])
-#    all_node_ip.extend(config[su][2])
+    all_node_ip.extend(config[mu][2])
+    all_node_ip.extend(config[su][2])
     # clear repeat IP...
     all_node_ip = {}.fromkeys(all_node_ip).keys()
     all_sockets = {}
@@ -183,10 +183,10 @@ def send_rule_to_node(sockets , rules) :
         if ret : 
             print "Send MU rule to " , ip , " failed ..."
             return -1
-#        ret = send_all_buckets(send_SU_command , rules[1] , ip , sockets[ip])
-#        if ret : 
-#            print "Send SU rule to " , ip , " failed ..."
-#            return -1
+        ret = send_all_buckets(send_SU_rule_command , rules[1] , ip , sockets[ip])
+        if ret : 
+            print "Send SU rule to " , ip , " failed ..."
+            return -1
 
 def get_mu_bucket_nr(user_id , all_buckets) : 
     return user_id % all_buckets
@@ -204,6 +204,7 @@ def get_su_bucket_nr(infohash , all_buckets) :
 # only send MU data , this is all user file data ...
 def send_all_MU_date_to_server(users , sockets , rules) : 
     mu_buckets_num = len(rules)
+    user_counter = 0
 
     for user in users : 
         try :
@@ -227,17 +228,11 @@ def send_all_MU_date_to_server(users , sockets , rules) :
             return -1
         fp.close()
 
-        print "Send all file data of user " , user_id , " to node : " ,{}.fromkeys(rules[nr]).keys()
+        user_counter += 1
+        if user_counter % 100 == 0 : 
+            print "Send " , user_counter , " users datas to MUs success , cost " , int(time.time()) - start_time , " seconds ..."
 
-    try : 
-        buf = struct.pack("ii" , finish_send_all_job_command , 0)
-        for ip in sockets : 
-            sockets[ip].sendall(buf)
-            print "Send finish all command success to node " , ip
-
-    except Exception as e : 
-        print "Send finish all command faied : " , e
-        return 
+#        print "Send all file data of user " , user_id , " to node : " ,{}.fromkeys(rules[nr]).keys()
 
     return 0
 
@@ -258,9 +253,8 @@ update_table_prefix = "update "
 normal_size = 524288
 default_path = "/home/terry/su_root"
 
+'''
 def deal_with_infohash(conn , infohash , bucket_nr) : 
-#    pdb.set_trace() 
-
     size = normal_size
     if random.randint(1 , 1000) == 0 : 
         size = random.randint(1024 , normal_size)
@@ -274,7 +268,19 @@ def deal_with_infohash(conn , infohash , bucket_nr) :
         return -1
 
     return 0
+'''
 
+def deal_with_infohash(sock , infohash , bucket_nr) : 
+    buf = struct.pack("iii" , send_SU_command , len(infohash) , bucket_nr)
+    buf = buf + infohash
+
+    try : 
+        sock.sendall(buf)
+    except Exception as e :
+        print "Send infohash " , infohash , " to bucket " , nr , " failed : " , e 
+        return -1
+
+    return 0
 
 
 def connect_all_mysql(config) : 
@@ -332,7 +338,7 @@ def create_su_buckets(conns , rules) :
                 return -1
     return 0
 
-def send_all_SU_data_to_server(users , conns , rules) : 
+def send_all_SU_data_to_server(users , socks , rules) : 
     global start_time
 
     su_buckets_num = len(rules)
@@ -359,7 +365,7 @@ def send_all_SU_data_to_server(users , conns , rules) :
                 nr = get_su_bucket_nr(data , su_buckets_num)
                 try : 
                     for ip in {}.fromkeys(rules[nr]).keys() : 
-                        if deal_with_infohash(conns[ip][1] , data , nr) : 
+                        if deal_with_infohash(socks[ip] , data , nr) : 
                             print "Deal with infohash " , data , " to node " , ip , " failed ..."
                             fp.close()
                             return -1
@@ -367,8 +373,7 @@ def send_all_SU_data_to_server(users , conns , rules) :
                     su_counter += 1
                     if not su_counter % 10000 : 
                         cur_time = int(time.time())
-                        print "finish insert " , su_counter , " infohashs , use %d seconds ..." %(cur_time - start_time)
-                        start_time = cur_time
+                        print "finish send " , su_counter , " infohashs , use %d seconds ..." %(cur_time - start_time)
                 except  Exception as e : 
                     print "Send file data of user " , user , " to MU " , ip , " failed : " , e
                     fp.close()
@@ -415,6 +420,18 @@ def wait_to_the_end(sockets) :
         if alive_ips == 0 : 
             break;
 
+def send_finish_infos(sockets) : 
+    try : 
+        buf = struct.pack("ii" , finish_send_all_job_command , 0)
+        for ip in sockets : 
+            sockets[ip].sendall(buf)
+            print "Send finish all command success to node " , ip
+
+    except Exception as e : 
+        print "Send finish all command faied : " , e
+        return 
+
+
 if __name__ == "__main__" : 
     if(len(sys.argv) != 2) : 
         print "./center config_file"
@@ -430,16 +447,14 @@ if __name__ == "__main__" :
 
     all_rule = assign_rule(config)
 
-#    all_sockets = connect_all_nodes(config[mu])
-    all_sockets = True
+    all_sockets = connect_all_nodes(config)
     if not all_sockets : 
         print "Connect to server failed ..."
         sys.exit(-1)
     else : 
         print "Connect to all server successfully..."
 
-#    ret = send_rule_to_node(all_sockets , all_rule)
-    ret = 0
+    ret = send_rule_to_node(all_sockets , all_rule)
     if ret : 
         print "Send all rule to nodes failed ..."
         close_all_sockets(all_sockets)
@@ -450,38 +465,39 @@ if __name__ == "__main__" :
     all_users = os.listdir(user_directory)
     print "Get all users infomations successfully , There are " , len(all_users) , " users ..."
 
-#    ret = send_all_MU_date_to_server(all_users , all_sockets , all_rule[0])
-    ret = 0
+    ret = send_all_MU_date_to_server(all_users , all_sockets , all_rule[0])
     if ret : 
         print "Send all user(MU) infomations to server failed ..."
         close_all_sockets(all_sockets)
         sys.exit(-1)
     else : 
-        print "Send all user(MU) infomations to server success ..."
-
-#    wait_to_the_end(all_sockets)
+        print "Send all user(MU) infomations to server success , cost " , int(time.time()) - start_time , " seconds..."
 
     all_conns = connect_all_mysql(config[su])
     if not all_conns : 
         print "Connect to mysqls failed ..."
         sys.exit(-1)
     else : 
-        print "Create connection to all mysqls success ..."
+        print "Create connection to all mysqls success , cost " , int(time.time()) - start_time , " seconds ..."
 
     if create_su_buckets(all_conns , all_rule[1]) : 
         print "Create all SU buckets failed ..."
         sys.exit(-1)
     else : 
-        print "Create all SU buckets success ..."
+        print "Create all SU buckets success , cost " , int(time.time()) - start_time , " seconds ..."
+    
+    close_all_connections(all_conns)
 
-    start_time = int(time.time())
-    cnt = send_all_SU_data_to_server(all_users , all_conns , all_rule[1])
+    print "Close all mysql connections success , cost " , int(time.time()) - start_time , " seconds ..."
+
+    cnt = send_all_SU_data_to_server(all_users , all_sockets , all_rule[1])
     if cnt < 0 :
         print "send all Infohash infomations to servers failed ..."
         sys.exit(-1)
     else : 
-        print "Send all infohash to SU success , counter " , cnt
+        print "Send all infohash to SU success , counter " , cnt , " cost " , int(time.time()) - start_time , " seconds ..."
+    
+    send_finish_infos(all_sockets)
+    wait_to_the_end(all_sockets)
 
-    close_all_connections(all_conns)
-
-    print "all data deploy finish ..."
+    print "all data deploy finish , cost " , int(time.time()) - start_time , " seconds ..."

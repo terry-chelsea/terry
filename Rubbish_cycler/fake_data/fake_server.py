@@ -10,6 +10,7 @@ import os
 
 fake_server_port = 12345
 mu_data_root = "/home/terry/mu_root/"
+su_data_root = "/home/terry/su_root/"
 su_database_port = 3306
 su_database_user = "user"
 su_database_pwd = "mysql"
@@ -78,9 +79,9 @@ def get_all_buckets(conn) :
     mu_buckets = get_buckets(conn , "MU" , send_MU_rule_command)
     if mu_buckets == None : 
         return 
-#    su_buckets = get_buckets(conn , "SU" , send_SU_rule_command)
-#    if su_buckets == None : 
-#        return 
+    su_buckets = get_buckets(conn , "SU" , send_SU_rule_command)
+    if su_buckets == None : 
+        return 
     return (mu_buckets , su_buckets)
 
 
@@ -99,6 +100,7 @@ def get_enough_data(conn , length) :
             return 
 
     return data
+
 
 
 using_characters = "abcdefghijklmnopqrstuvwxyz_"
@@ -150,6 +152,23 @@ def create_mu_buckets(buckets) :
             return -1
 
     return 0
+
+def create_su_buckets(buckets) : 
+    fps = {}
+    for buck in buckets : 
+        file_name = su_data_root + str(buck)
+        try : 
+            fp = open(file_name , "w")
+        except Exception as e : 
+            print "Create SU bucket file " , file_name , " failed : " , e
+            return 
+        fps[buck] = fp
+
+    return fps
+
+def delete_all_fps(all_fps) : 
+    for buck in all_fps : 
+        all_fps[buck].close()
 
 def get_subdirectorys(cur) : 
     dir_nums = 0
@@ -251,10 +270,17 @@ def deal_with_user_file(user , data , root) :
             del one_file[:]
 
 
-def do_server_work(conn , buckets_num) : 
+def deal_with_infohash(fp , infohash) : 
+    fp.write(infohash + '\n')
+    return 0
+
+
+def do_server_work(conn , buckets_num , all_fps) : 
     header_size = struct.calcsize("ii")
     user_size = struct.calcsize("i")
     all_users = 0
+    all_infohash = 0
+    all_fp_keys = all_fps.keys()
     while(True) : 
         try : 
             buf = get_enough_data(conn , header_size)
@@ -277,21 +303,28 @@ def do_server_work(conn , buckets_num) :
                     return ()
                 all_users += 1
 
-#            elif cmd == send_SU_command : 
-#                infohash = get_enough_data(conn , 40)
-#                if not infohash : 
-#                    print "Get Infohash message failed ..."
-#                    return ()
+            elif cmd == send_SU_command : 
+                bucket = conn.recv(user_size)
+                bucket_nr = struct.unpack("i" , bucket)[0]
+                infohash = get_enough_data(conn , 40)
+                if not infohash : 
+                    print "Get Infohash message failed ..."
+                    return ()
 
-#                if deal_with_infohash(infohash) : 
-#                    print "Deal with infohash message failed ..."
-#                    return ()
+                if bucket_nr not in all_fp_keys: 
+                    print "Wrong bucket number recieved : " , bucket_nr , " infohash : " , infohash
+                    return ()
 
+                if deal_with_infohash(all_fps[bucket_nr] , infohash) : 
+                    print "Deal with infohash message failed ..."
+                    return ()
+
+                all_infohash += 1
             elif cmd == finish_send_all_job_command : 
                 print "Successfully recieved all center message ..."
 #                pdb.set_trace()
 #                conn.close()
-                return (all_users , 0)
+                return (all_users , all_infohash)
                 
             else : 
                 print "Get undefined command while do server work , command : " , cmd
@@ -329,15 +362,16 @@ if __name__ == "__main__" :
             else : 
                 print "Create MU buckets success ..."
 
-#        if buckets[1] :
-#            print "SU buckets : " , buckets[1]
-#            if create_su_buckets(buckets[1]) : 
-#                print "Create SU buckets failed ..."
-#                sys.exit(-1)
-#            else : 
-#                print "Create SU buckets success ..."
+        if buckets[1] :
+            print "SU buckets : " , buckets[1]
+            all_fps = create_su_buckets(buckets[1])
+            if not all_fps : 
+                print "Create SU buckets failed ..."
+                sys.exit(-1)
+            else : 
+                print "Create SU buckets success ..."
 
-    ret = do_server_work(conn , len(buckets[0]))
+    ret = do_server_work(conn , len(buckets[0]) , all_fps)
     if not ret : 
         print "Do server work failed ..."
         send_finish_msg(conn , 1)
@@ -346,7 +380,7 @@ if __name__ == "__main__" :
         print "Do all server work success ..."
         if ret[0] : 
             print "This is a MU node , There are " , ret[0] , " users ..."
-#        if ret[1] : 
+        if ret[1] : 
             print "This is a SU node , There are " , ret[1] , " infohashs ..."
 
     send_finish_msg(conn , 0)
