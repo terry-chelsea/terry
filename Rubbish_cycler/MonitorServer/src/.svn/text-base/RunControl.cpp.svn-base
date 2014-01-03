@@ -1,0 +1,542 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  RunControl.cpp
+ *
+ *    Description:  CS初始化执行的一些东西，数据库，线程池等
+ *
+ *        Version:  1.0
+ *        Created:  11/05/12 17:15:54
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  terry , fengyuatad@@126.com
+ *        Company:  NDSL
+ *
+ * =====================================================================================
+ */
+#include "RunControl.h"
+#include "Log_warp.h"
+#include "CSConfiguration.h"
+#include "CS_Epoll.h"
+#include "Dispatcher.h"
+#include "ThreadPool.h"
+#include "../common/comm/comm.h"
+#include "../common/protocol/protocol.h"
+#include "Lib_tool.h"
+#include "SCAgent.h"
+#include "Register_agent.h"
+
+#include "MPCClientAgent.h"
+#include "SystemAgent.h"
+#include "HeartbeatAgent.h"
+#include "RSClientAgent.h"
+#include "CSNoticeAgent.h"
+
+#include "Init_system_task.h"
+#include "Check_heartbeat_timer.h"
+//#include "RS_Heartbeat_timer.h"
+
+#include "AgentRegister.h"
+#include "DB_operation.h"
+
+RunControl::RunControl()
+    :m_running(false) , 
+    m_su_finish(false) , 
+    m_mu_finish(false)
+{
+    LOG_INIT("\n-------------------System Initialize Infomation-------------------");
+}
+
+RunControl::~RunControl()
+{
+    //可以释放各种监听套接字和初始化对象
+}
+
+int RunControl::prepare_run()
+{
+    int ret = -1;
+    RuleInit *init_rule_handle = NULL;
+
+    // 无论是CS还是RS都需要使用Epoll ， 并且RS和CS使用一个Epoll
+    ret = CSEpoll::getInstance()->initialize(MAX_EPOLL_FD);
+
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::initialize epoll error !");
+        goto EPOLL_ERR;
+    }
+    LOG_INIT("Epoll Initialized successfully!");
+
+    //只有是CS的时候才需要使用线程池和数据库和调度器
+    ret = ThreadPool::getInstance()->start(CSConfiguration::getInstance()->thread_num);
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Initialize thread pool error !");
+        goto THREAD_POOL_ERR;
+    }
+    LOG_INIT("Thread Pool initialized Successfully !");
+
+    ret = Dispatcher::getInstance()->init(CSEpoll::getInstance() , 
+            ThreadPool::getInstance());
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Initialize Dispatcher error !");
+        goto DISPATCHER_ERR;
+    }
+    LOG_INIT("Dispatcher Initialized successfully !");
+
+    if(DBControl::getInstance()->init_dbcontrol(CSConfiguration::getInstance()->db_url) < 0)
+    {
+        LOG_ERROR("RunControl::Initialize database control error !");
+        goto CONNECT_POOL_ERR;
+    }
+    LOG_INIT("Database Control Initialized successfully !");
+
+    //初始化完成之后初始化规则表，在完成规则表初始化之后再启动监听
+    //CS从数据库中读取所有的规则信息
+    //RS从CS拉取所有的规则信息
+    init_rule_handle = new RuleInit();
+
+    ret = init_rule_handle->init_rule();
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Init Rule error !");
+        delete init_rule_handle;
+        goto CONNECT_POOL_ERR ;
+    }
+
+    delete  init_rule_handle;
+    init_rule_handle = NULL;
+
+    //如果当前规则为空，就执行监听MU或者SU的注册
+    m_su_finish = !RulerManager::getInstance()->should_init(SU_RULER);
+    m_mu_finish = !RulerManager::getInstance()->should_init(MU_RULER);
+    //如果MU或者SU其中一个没有初始化部署，执行监听工作
+    if(CSConfiguration::getInstance()->test_register) 
+    {
+        m_su_finish = false;
+        m_mu_finish = false;
+        CSConfiguration::getInstance()->start_derict = false;
+    }
+    m_mu_finish = m_mu_finish || CSConfiguration::getInstance()->mu_flag;
+    m_su_finish = m_su_finish || CSConfiguration::getInstance()->su_flag;
+    if(CSConfiguration::getInstance()->start_derict)
+        std::cerr<<"The server will start driectly..."<<std::endl;
+    else 
+        std::cerr<<"The server will wait for node register..."<<std::endl;
+    if(!m_su_finish)
+        std::cerr<<"SU need to be initialized..."<<std::endl;
+    else 
+        std::cerr<<"SU is intialized or do not need it..."<<std::endl;
+    if(!m_mu_finish)
+        std::cerr<<"MU need to be initialized..."<<std::endl;
+    else 
+        std::cerr<<"MU is intialized or do not need it..."<<std::endl;
+
+    if((!CSConfiguration::getInstance()->start_derict) && 
+            (!m_su_finish || !m_mu_finish))
+    {
+        if(wait_node_initialize() < 0)
+        {
+            LOG_ERROR("wait node initialize error !");
+            return -1;
+        }
+    }
+    else
+        start_server();
+
+    return 0;
+
+CONNECT_POOL_ERR :
+    delete Dispatcher::getInstance();
+
+DISPATCHER_ERR :
+    delete ThreadPool::getInstance();
+
+THREAD_POOL_ERR :
+    delete CSEpoll::getInstance();
+
+EPOLL_ERR :
+    delete g_pDevLog;
+    g_pDevLog = NULL;
+    
+    return -1;
+}
+
+int RunControl::start_timer()
+{
+    int ret = -1;
+    CheckHeartbeatAgent *check_timer = new CheckHeartbeatAgent(CSEpoll::getInstance() , 
+            CSConfiguration::getInstance()->check_heartbeat_interval , 0 , 
+            CSConfiguration::getInstance()->heartbeat_timeout);
+
+    ret = check_timer->init();
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Initialize check heartbeat timer error !");
+        delete check_timer;
+        return -1;
+    }
+
+    return 0;
+}
+int RunControl::start_server()
+{
+    int ret = -1;
+
+    LOG_INIT("Initilized Rule successfully !");
+    ret = start_cs_and_rs();
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Callback start listen error !");
+        return -1; 
+    }
+
+    if(start_timer() < 0)
+    {
+        LOG_ERROR("RunControl::Initialize timer for CS error !");
+        return -1;
+    }
+
+    LOG_INIT("Timer Initialized successfully for CS !");
+
+    m_running = true;
+    return 0;
+}
+
+int RunControl::listen_system_client()
+{
+    //如果这是一个RS模块，至少需要监听SYS
+    int ret = -1;
+    std::string host_ip = CSConfiguration::getInstance()->hostip;
+    SocketAddress listen_addr;
+    uint16_t port = CSConfiguration::getInstance()->rs_listen_sys_port;
+
+    TCPListenAgent<SystemAgent> *p_sys_listen_agent = 
+        new TCPListenAgent<SystemAgent>(CSEpoll::getInstance());
+    
+    listen_addr.setAddress(host_ip.c_str() , port);
+
+    ret = p_sys_listen_agent->init(listen_addr);
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Create System Listen Agent error !");
+        return -1;
+    }
+    LOG_INIT("Create System Listen Agent Successfully ! Port : " + int_to_str(port));
+
+    return 0;
+}
+
+int RunControl::listen_cs_agent()
+{
+    int ret = -1;
+    std::string host_ip = CSConfiguration::getInstance()->hostip;
+    SocketAddress listen_addr;
+    uint16_t port = 0;
+
+    //监听MPC的连接
+    port = CSConfiguration::getInstance()->cs_listen_mpc_port;
+    TCPListenAgent<MPCClientAgent> *p_MPC_listen_agent = 
+        new TCPListenAgent<MPCClientAgent>(CSEpoll::getInstance());
+    
+    listen_addr.setAddress(host_ip.c_str() , port);
+
+    ret = p_MPC_listen_agent->init(listen_addr);
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Create MPC Listen Agent error ! IP : " + 
+                host_ip + " Port : " + ushort_to_str(port));
+        return -1;
+    }
+    LOG_INIT("Create MPC Listen Agent Successfully ! Port : " + int_to_str(port));
+
+    //监听各个节点的心跳连接
+    port = CSConfiguration::getInstance()->cs_listen_hb_port;
+    TCPListenAgent<HeartbeatAgent> *p_hb_listen_agent = 
+        new TCPListenAgent<HeartbeatAgent>(CSEpoll::getInstance());
+    
+    listen_addr.setAddress(host_ip.c_str() , port);
+
+    ret = p_hb_listen_agent->init(listen_addr);
+    if(ret < 0)
+    {
+        LOG_ERROR("RunControl::Create Heartbeat Listen Agent error !");
+        return -1;
+    }
+    LOG_INIT("Create Heartbeat Listen Agent Successfully ! Port : " + int_to_str(port));
+    
+    return 0;
+}
+
+//如果这既是一个RS模块也是一个CS模块，需要监听多个套接口
+int RunControl::start_cs_and_rs()
+{
+    if(listen_cs_agent() < 0 || listen_system_client() < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int RunControl::run()
+{
+    LOG_INIT("\n-------------------------------------------------------------------");
+    CSEpoll::getInstance()->run();
+
+    return 0;
+}
+
+int RunControl::wait_node_initialize()
+{
+    std::string host = CSConfiguration::getInstance()->hostip;
+    SocketAddress listen_addr;
+    uint16_t port = CSConfiguration::getInstance()->rule_init_port;
+
+    listen_addr.setAddress(host.c_str() , port);
+
+    TCPListenAgent<RegisteNodeAgent> *p_reg_listen_agent = new TCPListenAgent<RegisteNodeAgent>(CSEpoll::getInstance());
+
+    if(p_reg_listen_agent->init(listen_addr) < 0)
+    {
+        LOG_ERROR("RunControl::Create Listen Register Agent error !");
+        return -1;
+    }
+    LOG_INIT("Create Listen Register Agent Successfully ! port : " + int_to_str(port));
+
+    return 0;
+}
+
+void RunControl::finish_register(RULE_TYPE type)
+{
+    if(!m_running)
+    {
+        if(start_server() < 0)
+        {
+            LOG_ERROR("start all server port error !");
+            exit(-1);
+        }
+
+        notice_all_node(type);
+        //套接字不析构，部署之后的所有注册请求都直接回复
+    }
+}
+
+//是否可以注册这个地址，如果可以说明系统尚未部署，如果不可以直接返回
+bool RunControl::can_register(RULE_TYPE type)
+{
+    static int count = 0;
+    ++ count;
+    std::cerr<<"No."<<count<<" come to check if need register!"<<std::endl;
+
+    if(MU_RULER == type)
+        return !m_mu_finish;
+    else
+        return !m_su_finish;
+}
+
+//当有节点注册的时候调用这个函数，查看当前存在的已经注册的节点，如果达到了上限，初始化规则
+void RunControl::node_register(struct Register_Info info , RULE_TYPE type)
+{
+    std::string ip_str;
+    int_to_string_ip(info.ip , ip_str);
+    std::cerr<<"register info ,  IP : "<<ip_str<<std::endl;
+
+    uint32_t index;
+    std::list<struct Register_Info>::iterator it;
+    if(MU_RULER == type)
+    {
+        for(it = m_mu_register_list.begin() ; it != m_mu_register_list.end() ; ++ it)
+        {
+            index = (*it).index;
+            if(NULL == AgentRegister::getInstance()->get_agent_from_index(index))
+            {
+                it = m_mu_register_list.erase(it);
+            }
+        }
+
+        m_mu_register_list.push_back(info);
+        if(m_mu_register_list.size() >= CSConfiguration::getInstance()->mu_number)
+            finish_register(type);
+    }
+    else
+    {
+        for(it = m_su_register_list.begin() ; it != m_su_register_list.end() ; ++ it)
+        {
+            index = (*it).index;
+            if(NULL == AgentRegister::getInstance()->get_agent_from_index(index))
+            {
+                it = m_su_register_list.erase(it);
+            }
+        }
+        m_su_register_list.push_back(info);
+        if(m_su_register_list.size() >= CSConfiguration::getInstance()->su_number)
+        {
+            finish_register(type);
+        }
+    }
+
+}
+
+void RunControl::notice_all_node(RULE_TYPE type)
+{
+    int mod , dup;
+    std::vector<uint32_t> used_ip_vec;
+    std::list<struct Register_Info>::iterator it;
+    if(MU_RULER == type)
+    {
+        mod = CSConfiguration::getInstance()->mu_init_mod;
+        dup = CSConfiguration::getInstance()->mu_init_dup;
+        for(it = m_mu_register_list.begin() ; it != m_mu_register_list.end() ; ++ it)
+        {
+            used_ip_vec.push_back((*it).ip);
+        }
+    }
+    else if(SU_RULER == type)
+    {
+        mod = CSConfiguration::getInstance()->su_init_mod;
+        dup = CSConfiguration::getInstance()->su_init_dup;
+        for(it = m_su_register_list.begin() ; it != m_su_register_list.end() ; ++ it)
+        {
+            used_ip_vec.push_back((*it).ip);
+        }
+    }
+    else 
+    {
+        LOG_ERROR("Undefined TYPE !");
+        exit(-1);
+    }
+
+    Init_info info;
+    info.all_ip_list = used_ip_vec;
+    info.dup = dup;
+    info.mod = mod;
+
+    //如果执行失败,退出!
+    InitSystemTask *init_task = new InitSystemTask(0 , type , info);
+    if(init_task->init(std::tr1::bind(&RunControl::after_init_system , this , 
+                    std::tr1::placeholders::_1 , 
+                    std::tr1::placeholders::_2)) < 0)
+    {
+        LOG_ERROR("CSConfiguration::init task initialize error !");
+        delete init_task;
+        exit(-1);
+    }
+
+    if(MU_RULER == type)
+        m_mu_finish = true;
+    else
+        m_su_finish = true;
+
+    m_init_task = init_task;
+}
+
+void RunControl::after_init_system(bool ret , RULE_TYPE type)
+{
+    if(m_init_task != NULL)
+    {
+        delete m_init_task;
+        m_init_task = NULL;
+    }
+
+    std::string cht = (MU_RULER == type ? "MU" : "SU");
+    if(!ret)
+    {
+        LOG_ERROR("Rule Init error ! type is " + cht);
+        exit(-1);
+    }
+
+    uint32_t ack = 0;
+    std::string empty_;
+    uint32_t index = 0;
+    CSTCPAgent *agent = NULL;
+    std::list<CSTCPAgent *> agent_list;
+    std::list<struct Register_Info>::iterator it;
+    if(MU_RULER == type)
+    {
+        ack = MSG_MU_CS_REGISTER_NODE_ACK;
+        for(it = m_mu_register_list.begin() ; it != m_mu_register_list.end() ; ++ it)
+        {
+            index = (*it).index;
+            agent = AgentRegister::getInstance()->get_agent_from_index(index);
+            if(agent != NULL)
+                agent_list.push_back(agent);
+        }
+    }
+    else
+    {
+        ack = MSG_SU_CS_REGISTER_NODE_ACK;
+        for(it = m_su_register_list.begin() ; it != m_su_register_list.end() ; ++ it)
+        {
+            index = (*it).index;
+            agent = AgentRegister::getInstance()->get_agent_from_index(index);
+            if(agent != NULL)
+                agent_list.push_back(agent);
+        }
+    }
+
+    std::list<CSTCPAgent *>::iterator it_agent;
+    //如果在部署期间所有的及节点都断开了连接，直接返回
+    if(agent_list.empty())
+        goto END;
+    for(it_agent = agent_list.begin() ; it_agent != agent_list.end() ; ++ it_agent)
+    {
+        agent = *it_agent;
+        agent->reply_request(ack , CS_OK , 0 , 0 , empty_);
+    }
+
+END:
+    if(MU_RULER == type)
+        m_mu_finish = true;
+    else
+        m_su_finish = true;
+}
+
+void RunControl::register_node_recycler(uint32_t index , RULE_TYPE type)
+{
+    if((MU_RULER == type && m_mu_finish) || (SU_RULER == type && m_su_finish))
+    {
+        std::cerr<<"********after init server********"<<std::endl;
+        return ;
+    }
+
+    std::list<struct Register_Info>::iterator it;
+    std::list<struct Register_Info>::iterator it_end;
+
+    if(MU_RULER == type)
+    {
+        it = m_mu_register_list.begin();
+        it_end = m_mu_register_list.end();
+    }
+    else 
+    {
+        it = m_su_register_list.begin();
+        it_end = m_su_register_list.end();
+    }
+
+    while(it != it_end)
+    {
+        if((*it).index == index)
+            break;
+
+        ++ it;
+    }
+    if(it == it_end)
+    {
+        std::cerr<<"Can not find this item from register list , index : "<<index<<std::endl;
+        return ;
+    }
+    else 
+    {
+        std::string ip_str;
+        int_to_string_ip((*it).ip , ip_str);
+        std::cerr<<"Find this node IP : "<<ip_str<<" and erase it ..."<<std::endl;
+
+        if(MU_RULER == type)
+            m_mu_register_list.erase(it);
+        else 
+            m_su_register_list.erase(it);
+    }
+}

@@ -1,0 +1,415 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  DB_operation.cpp
+ *
+ *    Description:  
+ *
+ *        Version:  1.0
+ *        Created:  01/07/13 14:55:16
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Heaven (), zhanwenhan@163.com
+ *        Company:  NDSL
+ *
+ * =====================================================================================
+ */
+
+#include "DB_operation.h"
+#include "Log_warp.h"
+#include "Lib_tool.h"
+#include "CSConfiguration.h"
+
+#define CHECK_INIT() do{ \
+    if(!this->m_binit){ \
+        LOG_ERROR("DBControl::Init database connection poll first before any operation!");\
+        return -1 ; \
+    }\
+}while(0)
+
+#define CHECK_CONNECTION_CREATED(conn) do{\
+    if(NULL == conn)\
+    {\
+        LOG_ERROR("DBControl::Create connection before use it !");\
+        return -1;\
+    }\
+}while(0)
+
+#define CHECK_PREPARE_CREATED(pre) do{\
+    if(NULL == pre)\
+    {\
+        LOG_ERROR("DBControl::Create Prepare statement before use it !");\
+        return -1;\
+    }\
+}while(0)
+
+const int MAX_LINE = 1024;
+const char *current_time = "now()";
+const char *last_insert_id = "select last_insert_id()";
+
+const char *op_types[] = {
+    "mu_migration" , 
+    "mu_extension" ,
+    "su_migration" , 
+    "su_extension" , 
+    "rubbish_recycler" , 
+    "mu_init_system" , 
+    "su_init_system" , 
+    NULL
+};
+
+DBControl::DBControl()
+    :m_url_handler(NULL) , 
+    m_connpool(NULL) , 
+    m_binit(false)
+{
+
+}
+
+DBControl::~DBControl()
+{
+    destory_dbcontrol();
+
+    m_binit = false;
+}
+
+int DBControl::init_dbcontrol(const std::string &url)
+{
+    URL_T url_p = NULL;
+    url_p = URL_new(url.c_str());
+    if(NULL == url_p)
+    {
+        LOG_ERROR("DBControl::Unstandard URL string : " + url);
+        return -1;
+    }
+
+    ConnectionPool_T conn_p = NULL;
+    conn_p = ConnectionPool_new(url_p);
+    if(NULL == conn_p)
+    {
+        LOG_ERROR("DBControl::create NEW connectionpool error , Maybe you should check database cs!!!");
+        return -1;
+    }
+
+    TRY
+    {
+        ConnectionPool_start(conn_p);
+    }
+    //catch这个异常可以返回-1而不是强制退出
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Start connection pool failed !");
+        return -1;
+    }
+    END_TRY;
+    
+    m_url_handler = url_p;
+    m_connpool = conn_p;
+    m_binit = true;
+
+    return 0;
+}
+
+void DBControl::destory_dbcontrol()
+{
+    if(m_connpool != NULL)
+    {
+        ConnectionPool_stop(m_connpool);
+        ConnectionPool_free(&m_connpool);
+        m_connpool = NULL;
+    }
+
+    if(m_url_handler != NULL)
+    {
+        URL_free(&m_url_handler);
+        m_url_handler = NULL;
+    }
+}
+
+Connection_T DBControl::create_connection()
+{
+    if(!this->m_binit)
+    { 
+        LOG_ERROR("DBControl::Init database connection poll first before any operation!");
+        return NULL ; 
+    }
+
+    Connection_T conn = ConnectionPool_getConnection(this->m_connpool);
+    if(NULL == conn)
+    {
+        LOG_ERROR("DBControl::crerate connection from connection pool error !");
+    }
+
+    return conn;
+}
+
+void DBControl::close_connection(Connection_T conn)
+{
+    ConnectionPool_returnConnection(this->m_connpool , conn);
+}
+
+int DBControl::execute_operation(Connection_T conn , const std::string &sql)
+{
+    CHECK_CONNECTION_CREATED(conn);
+
+    TRY
+    {
+        Connection_execute(conn , sql.c_str());
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Execute SQL operation error : " + sql);
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+}
+
+ResultSet_T DBControl::execute_query(Connection_T conn , const std::string &sql)
+{
+    if(NULL == conn)
+    {
+        LOG_ERROR("DBControl::Create connection before use it !");
+        return NULL;
+    }
+    
+    ResultSet_T ret_p = NULL;
+    TRY
+    {
+        ret_p = Connection_executeQuery(conn , sql.c_str());
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Execute SQL query error : " + sql);
+        return NULL;
+    }
+    END_TRY;
+    
+    return ret_p;
+}
+
+PreparedStatement_T DBControl::prepare_execute(Connection_T conn , const std::string &sql)
+{
+    if(NULL == conn)
+    {
+        LOG_ERROR("DBControl::Create connection before use it !");
+        return NULL;
+    }
+
+    PreparedStatement_T pre = NULL;
+    TRY
+    {
+        pre = Connection_prepareStatement(conn , sql.c_str());
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Prapare statement execate SQL error : " + sql);
+        return NULL;
+    }
+    END_TRY;
+
+    return pre;
+}
+
+int DBControl::bind_int_parameter(PreparedStatement_T pre , int index , int value)
+{
+    CHECK_PREPARE_CREATED(pre);
+    
+    TRY
+    {
+        PreparedStatement_setInt(pre , index , value);
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Prepare statement bind int parameter : index " 
+                + int_to_str(index) + " value " + int_to_str(value));
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+}
+
+int DBControl::bind_string_parameter(PreparedStatement_T pre , int index , const std::string &value)
+{
+    CHECK_PREPARE_CREATED(pre);
+
+    TRY
+    {
+        PreparedStatement_setString(pre , index , value.c_str());
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Prepare statement bind string parameter : index " 
+                + int_to_str(index) + " value " + value);
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+}
+
+int DBControl::bind_blob_parameter(PreparedStatement_T pre , int index , void *value , int size)
+{
+    CHECK_PREPARE_CREATED(pre);
+
+    TRY
+    {
+        PreparedStatement_setBlob(pre , index , value , size);
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::Prepare statement bind blob parameter : index " 
+                + int_to_str(index) + " size " + int_to_str(size));
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+}
+
+int DBControl::get_int_result(ResultSet_T ret , int index)
+{
+    int value = -1;
+    TRY
+    {
+        value = ResultSet_getInt(ret , index);
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::get int result error of index " + int_to_str(index));
+        return -1;
+    }
+    END_TRY;
+
+    return value;
+}
+
+int DBControl::get_string_result(ResultSet_T ret , int index , std::string &value)
+{
+    TRY
+    {
+        const char *ret_str = ResultSet_getString(ret , index);
+        if(NULL == ret_str)
+        {
+            LOG_ERROR("DBControl::get string result NULL !");
+            return -1;
+        }
+        else
+            value = ret_str;
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::get string result error of index " + int_to_str(index));
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+
+}
+
+int DBControl::prepare_execute_operation(PreparedStatement_T pre)
+{
+    CHECK_PREPARE_CREATED(pre);
+
+    TRY
+    {
+        PreparedStatement_execute(pre);
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::prepare execute operation error !");
+        return -1;
+    }
+    END_TRY;
+
+    return 0;
+}
+
+ResultSet_T DBControl::prepare_execute_query(PreparedStatement_T pre)
+{
+    if(NULL == pre)
+    {
+        LOG_ERROR("DBControl::Create Prepare statement before use it !");
+        return NULL;
+    }
+
+    ResultSet_T ret = NULL;
+    TRY
+    {
+        ret = PreparedStatement_executeQuery(pre);
+    }
+    CATCH(SQLException)
+    {
+        LOG_ERROR("DBControl::prepare execurate query error !");
+        return NULL;
+    }
+    END_TRY;
+
+    return ret;
+}
+
+
+
+int DBControl::log_op_info_start(Connection_T conn , OP_TYPE type , const std::string &info)
+{
+    char sql[MAX_LINE];
+    memset(sql , 0 , MAX_LINE);
+    int len = snprintf(sql , MAX_LINE , "insert into %s values (null , \"%s\" , \"%s\"  , %d , null , %s , null)" , 
+            CSConfiguration::getInstance()->history_table.c_str() , 
+            op_types[type] , info.c_str() , 0 , current_time);
+
+    if(this->execute_operation(conn , sql) < 0)
+    {
+        LOG_ERROR("DBControl::log start infomation of operations error : " + 
+                std::string(sql , len));
+        return -1;
+    }
+    
+    ResultSet_T ret = NULL ; 
+    int last_id = 0;
+    if((!(ret = this->execute_query(conn , last_insert_id))) || (!ResultSet_next(ret)) ||
+            ((last_id = this->get_int_result(ret , 1)) < 0))
+    {
+        LOG_ERROR("DBControl::check last insert value error !");
+        return -1;
+    }
+    
+    return last_id;    
+}
+
+int DBControl::log_op_info_end(Connection_T conn , int id , bool ret , const std::string &add)
+{
+    char sql[MAX_LINE];
+    memset(sql , 0 , MAX_LINE);
+    int ret_value = ret ? 1 : -1;
+    int len = snprintf(sql , MAX_LINE , "update %s set state=%d , addition=\"%s\" , end=%s where id=%d" ,
+            CSConfiguration::getInstance()->history_table.c_str() , ret_value , add.c_str() , 
+            current_time , id);
+
+    if(this->execute_operation(conn , sql) < 0)
+    {
+        LOG_ERROR("DBControl::log end infomation of operation error : " + 
+                std::string(sql , len));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+//因为数据库句柄需要被多个线程共享，因此尽量减少共享资源，也就是该对象的成员遍历
+//每次使用局部遍历获取规则表名和版本表名
+std::string DBControl::get_rule_table_name(RULE_TYPE type)
+{
+    return (MU_RULER == type) ? CSConfiguration::getInstance()->mu_rule_table : CSConfiguration::getInstance()->su_rule_table;
+}
+
+std::string DBControl::get_order_table_name(RULE_TYPE type)
+{
+    return (MU_RULER == type) ? CSConfiguration::getInstance()->mu_order_table : CSConfiguration::getInstance()->su_order_table;
+}
+

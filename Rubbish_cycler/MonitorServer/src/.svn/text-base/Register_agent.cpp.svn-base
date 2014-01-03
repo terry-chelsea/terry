@@ -1,0 +1,109 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  Register_agent.cpp
+ *
+ *    Description:  
+ *
+ *        Version:  1.0
+ *        Created:  01/23/13 17:28:24
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Heaven (), zhanwenhan@163.com
+ *        Company:  NDSL
+ *
+ * =====================================================================================
+ */
+
+#include "Register_agent.h"
+#include "RulerManager.h"
+#include "../common/protocol/protocol.h"
+#include "Log_warp.h"
+#include "Lib_tool.h"
+#include "RunControl.h"
+
+RegisteNodeAgent::RegisteNodeAgent(const TCPSocket &sock , const SocketAddress &addr , Epoll *epl)
+    :CSTCPAgent(sock , addr , epl)
+{
+    std::cerr<<"get register connection from : "<<addr.getIP()<<" and port : "<<addr.port<<std::endl;
+}
+
+void RegisteNodeAgent::readBack(InReq &req)
+{
+    MsgHeader header = req.m_msgHeader;
+    if(header.cmd != MSG_SU_CS_REGISTER_NODE && header.cmd != MSG_MU_CS_REGISTER_NODE)
+    {
+        LOG_ERROR("RegisteNodeAgent::Undefined request command !");
+        std::string empty_;
+        CSTCPAgent::reply_request(MSG_MU_CS_REGISTER_NODE_ACK , CS_ERROR , 0 , 0 , empty_);
+        return ;
+    }
+
+    std::string in_data(req.ioBuf , header.length);
+    if(header.cmd == MSG_SU_CS_REGISTER_NODE)
+    {
+        cstore::pb_MSG_SU_CS_REGISTER_NODE info_pb;
+        if(!info_pb.ParseFromString(in_data))
+        {
+            LOG_ERROR("RegisteNodeAgent::Parse register info error !");
+            return ;
+        }
+
+        std::cerr<<"-----------register info-------------"<<std::endl;
+        std::cerr<<info_pb.DebugString()<<std::endl;
+
+        uint32_t node_ip = info_pb.node_ip();
+
+        struct Register_Info info;
+        info.index = CSTCPAgent::m_index;
+        info.ip = node_ip;
+        m_type = SU_RULER;
+
+        if(RunControl::getInstance()->can_register(SU_RULER))
+        {
+            RunControl::getInstance()->node_register(info , SU_RULER);
+        }
+        else
+        {
+            std::string empty_;
+            CSTCPAgent::reply_request(MSG_SU_CS_REGISTER_NODE_ACK , CS_OK , 0 , 0 , empty_);
+        }
+    }
+    else
+    {
+        cstore::pb_MSG_MU_CS_REGISTER_NODE info_pb;
+        if(!info_pb.ParseFromString(in_data))
+        {
+            LOG_ERROR("RegisteNodeAgent::Parse register info error !");
+            return ;
+        }
+
+        std::cerr<<"-----------register info-------------"<<std::endl;
+        std::cerr<<info_pb.DebugString()<<std::endl;
+
+        uint32_t node_ip = info_pb.node_ip();
+
+        struct Register_Info info;
+        info.index = CSTCPAgent::m_index;
+        info.ip = node_ip;
+        m_type = MU_RULER;
+
+        if(RunControl::getInstance()->can_register(MU_RULER))
+        {
+            RunControl::getInstance()->node_register(info , MU_RULER);
+        }
+        else
+        {
+            std::string empty_;
+            CSTCPAgent::reply_request(MSG_MU_CS_REGISTER_NODE_ACK , CS_OK , 0 , 0 , empty_);
+        }
+    }
+}
+
+int RegisteNodeAgent::recycler()
+{
+    std::cerr<<"----------register node "<<TCPAgent::m_Addr.getIP()<<" is recyclering------------"<<std::endl;
+    
+    RunControl::getInstance()->register_node_recycler(CSTCPAgent::m_index , m_type);
+}

@@ -1,0 +1,121 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  config_path.h
+ *
+ *    Description:  
+ *
+ *        Version:  1.0
+ *        Created:  01/28/13 10:23:59
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Heaven (), zhanwenhan@163.com
+ *        Company:  NDSL
+ *
+ * =====================================================================================
+ */
+
+#ifndef _H_CONFIG_PATH_H_
+#define _H_CONFIG_PATH_H_
+//#define CSN
+
+typedef enum
+{
+    LOG_TYPE = 0,
+    MU_PORT , 
+    SU_PORT  , 
+    MPC_PORT , 
+    HB_PORT , 
+    RS_PORT , 
+    INIT_PORT , 
+    HOST_IP , 
+    MU_NODES , 
+    MU_MOD , 
+    MU_DUP , 
+    SU_NODES ,
+    SU_MOD , 
+    SU_DUP , 
+    DB_NAME , 
+    DB_USER , 
+    DB_PASSWD , 
+    DB_IP , 
+    DB_PORT , 
+    MU_HASH , 
+    MU_ORDER , 
+    SU_HASH , 
+    SU_ORDER , 
+    HISTORY_TABLE , 
+    THREAD_NUM , 
+    TIMER_HB , 
+    TIMEOUT_HB , 
+    MIGRATION_RETRY , 
+    CONFIG_MAX 
+}CONFIG_ITEM;
+
+const char *config_normal[CONFIG_MAX + 1] = {
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Log_type" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU_port" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU_port" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MPC_listen_port" ,
+    "/CONFIG/MODULE_CONFIG/MUTABLE/LISTEN_PORT/ALL_CStoreCS_PORT" ,
+    "/CONFIG/MODULE_CONFIG/MUTABLE/LISTEN_PORT/ALL_CStoreRS_PORT" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Init_Port" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Local" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU_mod" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU_dup" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU" ,
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU_mod" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU_dup" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Db" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/User" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Passwd" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/IP" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Port" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU_hash" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/MU_order" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU_hash" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/SU_order" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/History" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/number" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Check_HB" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/HB_timeout" , 
+    "/CONFIG/MODULE_CONFIG/UNMUTABLE/Retry" , 
+    NULL
+};
+
+const char *config_auto[CONFIG_MAX + 1] = {
+    "/MODULE_CONFIG/UNMUTABLE/Log/Log_type" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Port/MU_port" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/Port/SU_port" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/Port/MPC_listen_port" ,
+    "/MODULE_CONFIG/MUTABLE/LISTEN_PORT/SU_CS_PORT" ,
+    "/MODULE_CONFIG/MUTABLE/LISTEN_PORT/SU_RS_PORT" ,
+    "/MODULE_CONFIG/MUTABLE/LISTEN_PORT/SU_RS_PORT1" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/IP/Local" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/MU" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/MU_mod" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/MU_dup" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/SU" ,
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/SU_mod" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Node/SU_dup" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/Db" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/User" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/Passwd" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/IP" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/Port" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/MU_hash" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/MU_order" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/SU_hash" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/SU_order" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/DB/History" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Thread/number" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Time/Check_HB" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Time/HB_timeout" , 
+    "/MODULE_CONFIG/UNMUTABLE/CS/Migration/Retry" , 
+    NULL
+};
+
+
+#endif

@@ -1,0 +1,56 @@
+<Terry>
+    <Log>
+        <Log_type>0</Log_type>
+    </Log>
+
+    <Module>
+        <CS>1</CS>
+        <RS>1</RS>
+    </Module>
+
+    <CS>
+        <Port>
+            <MU_port>12345</MU_port>
+            <SU_port>7702</SU_port>
+            <RS_listen_CS_port>16160</RS_listen_CS_port>
+            <MPC_listen_port>16600</MPC_listen_port>
+            <MPC_port>9736</MPC_port>
+            <RS_CS_port>16603</RS_CS_port>
+            <HB_port>16601</HB_port>
+        </Port>
+
+        <DB>
+            <Dsn>cs</Dsn>
+        </DB>
+
+        <Thread>
+            <number>2</number>
+        </Thread>
+
+        <Time>
+            <Report_MPC>15</Report_MPC>
+            <Check_HB>10</Check_HB>
+            <HB_timeout>60</HB_timeout>
+        </Time>
+
+        <IP>
+            <MPC_IP>192.168.9.63</MPC_IP>
+        </IP>
+    </CS>
+
+    <RS>
+        <Port>
+            <RS_port>16602</RS_port>
+            <RS_CS_port>16603</RS_CS_port>
+            <RS_listen_CS_prot>16160</RS_listen_CS_prot>
+            <HB_port>16601</HB_port>
+        </Port>
+
+        <IP>
+            <CS_IP>192.168.10.43</CS_IP>
+        </IP>
+
+        <Direct_reply>1</Direct_reply>
+        <CS_heartbeat_time>3</CS_heartbeat_time>
+    </RS>
+</Terry>

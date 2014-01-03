@@ -1,0 +1,102 @@
+
+#include "RulerManager.h"
+#include "HB_manager.h"
+#include "rubbish_recycler.h"
+#include "Log_warp.h"
+#include "Lib_tool.h"
+
+#define PCS 1e-10
+#define MAX_HASH_FUNC  20
+//计算出数val的1/n，误差在指定范围内...使用迭代的方法每次逼近结果...
+static double nsqrt(double val , unsigned int n)
+{
+    double low = 0 , high = val;
+    if(val < 1)
+        high = 1;
+    double mid = (low + high) / 2;
+
+    if(n == 1 || 1 == val)
+        return val;
+
+    double powv = pow(mid , n);
+    while(powv - val > PCS || val - powv > PCS)
+    {
+        if(powv > val)
+            high = mid;
+        else 
+            low = mid;
+
+        if(high - low < PCS)
+            break;
+        mid = (low + high) / 2;
+        powv = pow(mid , n);
+    }
+
+//    printf("pow(%lf , %d) = %lf  compare %lf\n" , mid , n , pow(mid , n) , val);
+    return mid;
+}
+
+//根据bloom filter算法的数学模型在给定元素集合大小和错误率时候计算出最佳的位图大小和对应的
+//哈希函数的数目
+static double cal_bitmap_size(unsigned long long set_size , double err_rate , int &hash)
+{
+    double min = set_size * 1000;
+    double m = 0;
+    
+    int i = 0;
+    for(i = 2 ; i <= MAX_HASH_FUNC ; ++ i)
+    {
+        double tmp = 1 - nsqrt(err_rate , i);
+        m = (-1) * i * (set_size + 0.5) / log(tmp) + 1;
+        if(m < min)
+        {
+            min = m;
+            hash = i;
+        }
+    }
+
+    return min;
+}
+
+static int start_all_mus()
+{
+    //计算出当前桶的总数...
+    int nums = RulerManager::getInstance()->get_bucket_number(MU_RULER); 
+    std::vector<uint32_t> all_mu_ips;
+    HBItr _begin = HBManager::getInstance()->map_begin(MU_RULER);
+    HBItr _end = HBManager::getInstance()->map_end(MU_RULER);
+    for( ; _begin != _end ; ++_begin)
+        all_mu_ips.push_back(_begin.first);
+
+
+}
+
+#define ERROR_RATE  0.01
+#define ALIGN_TO_BYTE(n) (((n % 8 != 0) && (n = ((n + 7) & (~0x7U)))) , n)
+int rrc::start_do_recylcer(uint32_t agent_index , unsigned long long scale)
+{
+    printf("agent index : %d and scale blocks : %lld\n" , agent_index , scale);
+
+    //第一步、根据有效集合的大小(这里MPC给定的是一个参考值)和执行的错误率，计算出对应的
+    //最佳的大小和哈希函数的数目...
+    int hash_num = 0;
+    double bits = cal_bitmap_size(scale , ERROR_RATE , hash_num);
+    uint64_t ubits = (uint64_t)bits;
+    uint64_t bytes = ALIGN_TO_BYTE(ubits) / 8;
+
+    //第二步，创建一些agent向MU发起连接...
+    if(start_all_mus() < 0)
+    {
+        LOG_ERROR("start all MU to start rubbish recycler failed ...");
+        return -1;
+    }
+    //第三步，监视MU的状态，等待MU操作的完成...
+
+    //第四步，等待所有的bucket都完成，合并全部MU得到的位图...
+    //第五步，创建一些agent向SU发起连接...
+    //第六步，监视这些鱼SU保持通信的连接的状态，并且处理删除操作...
+    //第七步，统计删除信息，查看MPC是否关闭，释放对应的资源...
+
+    return 0;
+}
+

@@ -19,6 +19,7 @@
 #include<stdio.h>
 #include<string.h>
 #include<stdlib.h>
+#include "Log/Debug.h"
 #include "Epoll.h"
 #include "Socket.h"
 #include "Thread.h"
@@ -38,17 +39,37 @@
  */
 
 #define XML_FILE  "config.xml"
+#define DEFAULT_GB_PORT            12345
+#define DEFAULT_LOG_TYPE           2
 
 GLOBLE_VALUE g_global_value;
 
 int main(int argc , char *argv[])
 {
 //    getopt;             //首先获取命令行参数
-    
-    if(read_config(XML_FILE) < 0)       //读取xml的配置信息
+    char ch = 0;
+    int err = 0;
+    unsigned short port = DEFAULT_GB_PORT;
+    OUT_TYPE TYPE = DEFAULT_LOG_TYPE;
+    while((ch = getopt(argc , argv , "h:p:l:")) != -1)
     {
-        LOG_ERROR("Init error : read_config error!");
-        goto EXIT ;
+        switch(ch)
+        {
+            case 'p' : 
+                port = (unsigned int)atoi(optarg);
+                break;
+            case 'l' : 
+                int temp = atoi(optarg);
+                if(temp >= OUT_SCR && temp <= OUT_BOTH)
+                    type = temp;
+                else 
+                    type = DEFAULT_LOG_TYPE;
+                break;
+            case '?' :
+                printf("Error command : ./command -p port -l log_type \n");
+                return -1;
+                break;
+        }
     }
 
     int epoll_fd = create_epoll(EPOLL_NUM);      //创建Epoll
@@ -77,17 +98,6 @@ int main(int argc , char *argv[])
         goto FREE_LISTEN_FD ;
     }
     
-    char *all_memroy = allocate_all_memory(xml_config.all_memory_size);   //分配所有需要的内存。
-    if(NULL == all_memroy)
-    {
-        LOG_ERROR("Init error : allocate all memory error!");
-        goto FREE_PIPE_FDS ; 
-    }
-    else
-    {
-        g_global_value.g_all_memory = all_memroy;
-    }
-
     create_thread(&g_global_value);
 
     LOG_INFO_TIME("Init success !");

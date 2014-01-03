@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<CS_CONFIG>
+    <Log>
+        <Log_type>0</Log_type>
+    </Log>
+
+    <CS>
+        <Port>
+            <!--MU监听CS发送迁移和扩展操作的端口-->
+            <MU_port>45001</MU_port>
+            <!--SU监听CS发送迁移和扩展操作的端口-->
+            <SU_port>7704</SU_port>
+            <!--监听MPC命令的端口-->
+            <MPC_listen_port>16620</MPC_listen_port>
+            <!---监听心跳连接的端口 -->
+            <HB_port>16601</HB_port>
+            <!--对系统提供规则的监听端口-->
+            <RS_port>16602</RS_port>
+
+            <!--监听MU和SU注册IP地址的端口，在第一次启动之前，之后不再使用-->
+            <Init_Port>16603</Init_Port>
+        </Port>
+
+        <IP>
+            <!--本机的IP，设置为0表示监听所有的地址 -->
+            <Local>0</Local>
+        </IP>
+
+        <Node>
+            <MU>1</MU>
+            <MU_mod>3</MU_mod>
+            <MU_dup>1</MU_dup>
+            <SU>4</SU>
+            <SU_mod>4</SU_mod>
+            <SU_dup>1</SU_dup>
+        </Node>
+
+        <!--数据库信息，包括表名，但是不一定需要建表 -->
+        <DB>
+            <Db>cs</Db>
+            <User>root</User>
+            <Passwd>mysql</Passwd>
+            <IP>localhost</IP>
+            <Port>3306</Port>
+            <MU_hash>mu_rule</MU_hash>
+            <MU_order>mu_order</MU_order>
+            <SU_hash>su_rule</SU_hash>
+            <SU_order>su_order</SU_order>
+            <History>operation_history</History>
+        </DB>
+
+        <!--线程池的线程数-->
+        <Thread>
+            <number>2</number>
+        </Thread>
+
+        <Time>
+            <!--定时检查心跳信息的超时值-->
+            <Check_HB>10</Check_HB>
+            <!--判断心跳超时的最大超时时间-->
+            <HB_timeout>60</HB_timeout>
+        </Time>
+
+        <Migration>
+            <Retry>10</Retry>
+        </Migration>
+    </CS>
+</CS_CONFIG>

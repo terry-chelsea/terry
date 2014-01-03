@@ -1,0 +1,12 @@
+
+#ifndef _RUBBISH_RECYCLER_H__
+#define _RUBBISH_RECYCLER_H__
+
+#include <iostream>
+
+namespace rrc
+{
+   extern int start_do_recylcer(uint32_t agent_index , unsigned long long scale);
+};
+
+#endif

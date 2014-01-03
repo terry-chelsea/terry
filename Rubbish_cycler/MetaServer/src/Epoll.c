@@ -125,7 +125,7 @@ int epoll_run(int epoll_fd)
                     socket_error = 1;
                 }
             }
-            else if(ready_fd ==  g_global_value.heartbeat_ack_fd)
+            else if(ready_fd == g_global_value.heartbeat_ack_fd)
             {
                 //所以的错误事件都会触发EPOLLIN和EPOLLOUT，不单独检查错误。
                 unsigned int event = ready_events[i].events;
